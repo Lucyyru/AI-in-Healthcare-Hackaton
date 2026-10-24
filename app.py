@@ -5,7 +5,7 @@
 # 2. VISUALS: CSS design system         -> colours, layout, cards, buttons, tabs, ratings
 # 3. Visual helper functions            -> HTML snippets, charts, stats, result panels
 # 4. Sidebar                             -> privacy toggles and advanced settings
-# 5. Hero and navigation tabs           -> top banner and the four main app areas
+# 5. Hero and navigation tabs           -> top banner and the main app areas
 # 6. Exercise analysis                  -> upload, analyse, compare, results and tips
 # 7. Calendar history                   -> saved movement-analysis history and chart
 # 8. Data & safety                      -> data inventory, validation and limitations
@@ -31,6 +31,7 @@ import streamlit as st
 
 import core
 import store
+from insights import history_frame, sessions_for, progress_summary, insight_messages
 from core import CFG, EXERCISES, SAFETY_NOTE, SignalConfig, build_tips, compare, percent_of_typical
 from robust import analyze_upload
 
@@ -330,18 +331,20 @@ def themed(chart):
 # ------------------------------------------------------------------ navigation / settings
 # ======================================================================
 # PRIMARY INFORMATION ARCHITECTURE
-# The app has three top-level destinations only:
-#   1. Analyse Movement  -> the core product
-#   2. My Recovery       -> movement history + optional wellbeing context
-#   3. More              -> medication, data/privacy and settings
-# This keeps the judging/demo flow focused without removing functionality.
+# The app has four top-level destinations:
+#   1. Analyse Movement  -> the core rehabilitation product
+#   2. AccessScan        -> wheelchair-fit image upload and future analysis
+#   3. My Recovery       -> movement history + optional wellbeing context
+#   4. More              -> medication, data/privacy and settings
+# AccessScan is frontend-only for now; the production backend can be wired into its analysis button.
 # ======================================================================
 
 # Defaults are kept in session state so changing a setting immediately reruns the app
 # with the selected value. The pose model itself remains bundled and on-device.
 view_mode = st.session_state.get("view_mode", "📱 Phone")
 blur_face = st.session_state.get("blur_face", True)
-save_history = st.session_state.get("save_history", False)
+privacy_mode = st.session_state.get("privacy_mode", "Private mode")
+save_history = privacy_mode == "Progress mode"
 conf_thresh = float(st.session_state.get("conf_thresh", CFG.conf_thresh))
 min_prom = float(st.session_state.get("min_prom", CFG.min_prominence))
 complexity = 1
@@ -379,9 +382,97 @@ html(
     '<span class="pill">🛑 Refuses unreliable scores</span></div></div>'
 )
 
-# Only three top-level destinations. Everything that supports the movement experience
-# lives one level below the core analysis and recovery views.
-tab_main, tab_recovery, tab_more = st.tabs(["Analyse Movement", "My Recovery", "More"])
+# AccessScan gets its own top-level destination because it is a distinct real-world
+# accessibility workflow and a strong demo moment.
+tab_main, tab_access, tab_recovery, tab_more = st.tabs(["Analyse Movement", "♿ AccessScan", "My Recovery", "More"])
+
+with tab_access:
+    html(
+        '<div class="prom-banner">'
+        '<div class="eyebrow">ACCESSIBILITY CHECK</div>'
+        '<h2>Will my wheelchair fit?</h2>'
+        '<p>Upload a photo of a doorway or passage. AccessScan is designed to estimate the opening and compare it with your wheelchair width.</p>'
+        '</div>'
+    )
+
+    html(
+        '<div class="callout"><b>Frontend preview.</b> Image capture and the result area are ready. '
+        'The measurement service can be connected to the Analyse button when the production backend is available.</div>'
+    )
+
+    step(1, "Tell us your wheelchair width", "Used to calculate estimated clearance")
+    wheelchair_width = st.number_input(
+        "Wheelchair width (cm)",
+        min_value=30.0,
+        max_value=120.0,
+        value=68.0,
+        step=0.5,
+        key="accessscan_wheelchair_width",
+        help="Measure the widest part of the wheelchair. This stays on this device in the current prototype.",
+    )
+
+    step(2, "Add a photo", "Keep the whole doorway or passage visible")
+    access_image = st.file_uploader(
+        "Upload doorway or passage image",
+        type=["jpg", "jpeg", "png", "webp"],
+        key="accessscan_image",
+        help="Take the photo as straight-on as possible and include the full opening.",
+    )
+
+    if access_image is not None:
+        st.image(access_image, caption="Image ready for AccessScan", use_container_width=True)
+        st.caption("Tip: a straight-on photo with the full opening visible will give the future measurement backend the best input.")
+    else:
+        html(
+            '<div class="icard" style="text-align:center;padding:1.8rem 1.2rem;">'
+            '<div class="ic" style="margin-left:auto;margin-right:auto;">📷</div>'
+            '<h3>Photograph the space</h3>'
+            '<p>Doorways, corridors and narrow passages can be checked here before you arrive.</p>'
+            '</div>'
+        )
+
+    step(3, "Check the fit", "AccessScan will return clearance and confidence")
+    access_go = st.button(
+        "Analyse accessibility",
+        type="primary",
+        disabled=access_image is None,
+        use_container_width=True,
+        key="accessscan_analyse",
+    )
+
+    if access_image is None:
+        st.caption("Upload a photo above to enable analysis.")
+
+    if access_go:
+        # BACKEND INTEGRATION POINT:
+        # Send `access_image.getvalue()` and `wheelchair_width` to the production AccessScan backend here.
+        # Expected future response fields could include opening_width_cm, uncertainty_cm,
+        # clearance_cm, confidence, and verdict (fits / too_narrow / uncertain).
+        st.session_state["accessscan_pending"] = True
+
+    if st.session_state.get("accessscan_pending") and access_image is not None:
+        with st.container(border=True):
+            html('<div class="ptitle"><span class="tag">AccessScan</span>Measurement result</div>')
+            st.info("The frontend is ready. Connect the production AccessScan backend here to return the measured opening, clearance and confidence.")
+            r1, r2, r3 = st.columns(3)
+            r1.metric("Opening", "— cm")
+            r2.metric("Wheelchair", f"{wheelchair_width:.1f} cm")
+            r3.metric("Clearance", "— cm")
+            st.markdown("**Fit decision**")
+            html(
+                '<div class="notice warn"><b class="t">Waiting for measurement backend</b>'
+                'No accessibility verdict is shown until a real measurement and its uncertainty are available.</div>'
+            )
+            st.caption("Recommended backend outputs: opening width ± uncertainty, wheelchair width, clearance, confidence, and Fits / Too narrow / Too close to call.")
+
+    with st.expander("How AccessScan should make a safe decision", expanded=False):
+        st.markdown(
+            "- Compare the estimated clear opening with the wheelchair width.\n"
+            "- Return the measurement with an uncertainty range, not just one number.\n"
+            "- If the uncertainty overlaps the required clearance, show **Too close to call** instead of guessing.\n"
+            "- Treat the result as an accessibility estimate, not a guarantee; handles, thresholds and approach angle can still matter."
+        )
+
 
 with tab_recovery:
     st.markdown("### Your recovery, over time")
@@ -422,17 +513,24 @@ with tab_settings:
     st.caption("You can use SpyMotion without changing any of these settings.")
 
     st.markdown("#### Privacy & saving")
+    privacy_mode = st.radio(
+        "Choose your data mode",
+        ["Private mode", "Progress mode"],
+        index=0 if st.session_state.get("privacy_mode", "Private mode") == "Private mode" else 1,
+        key="privacy_mode",
+        help="Private mode keeps no movement history. Progress mode lets you explicitly save selected numeric results for trends.",
+    )
+    save_history = privacy_mode == "Progress mode"
+    if save_history:
+        html('<div class="notice ok"><b class="t">Progress mode</b>Nothing is saved automatically. After each reliable analysis, you choose whether to save the numeric result. The original video is never added to history.</div>')
+    else:
+        html('<div class="notice ok"><b class="t">Private mode</b>Movement results are session-only. No movement history is written unless you switch modes and explicitly save a result.</div>')
+
     blur_face = st.toggle(
         "Blur my face in the result video",
         value=True,
         key="blur_face",
         help="The original upload is temporary either way; audio is removed from the result video.",
-    )
-    save_history = st.toggle(
-        "Save my movement numbers on this device",
-        value=False,
-        key="save_history",
-        help="Only derived numbers are saved, never the original video.",
     )
 
     with st.expander("Advanced analysis settings", expanded=False):
@@ -453,7 +551,7 @@ with tab_settings:
     if st.button("🗑 Delete everything now", use_container_width=True, key="settings_delete_everything"):
         _rep = store.delete_everything_report()
         # Preserve UI settings while clearing analysis/data session state.
-        _keep = {k: st.session_state.get(k) for k in ("view_mode", "blur_face", "save_history", "conf_thresh", "min_prom")}
+        _keep = {k: st.session_state.get(k) for k in ("view_mode", "blur_face", "privacy_mode", "conf_thresh", "min_prom")}
         st.session_state.clear()
         for _k, _v in _keep.items():
             if _v is not None:
@@ -529,13 +627,8 @@ def run_one(upl, ex_key: str, side: str, label: str) -> dict:
     entry = {"res": res, "video": video, "label": label, "key": key}
     if not res.meta.get("failed"):  # do not cache a failure: a retry should really retry
         cache[key] = entry
-    if save_history and res.status != "rejected":
-        saved = st.session_state.setdefault("saved", set())
-        if key not in saved:
-            if store.append_entry({"exercise": ex_key, "side": res.meta["side"], "label": label, **res.summary()}):
-                saved.add(key)
-            else:
-                st.warning("Your result is shown, but it could not be saved to your history (disk problem).")
+    # Privacy design: analysis never writes movement history automatically.
+    # A reliable latest result can be saved explicitly from the result screen when Progress mode is enabled.
     return entry
 
 
@@ -607,6 +700,14 @@ def result_panel(entry, ex, ymax, title, tag) -> None:
             ("Tracking quality", "Good" if res.status == "good" else "Fair", f"{res.confidence:.0%} confidence"),
         ])
 
+        # Make reliability visible instead of hiding it inside an engineering expander.
+        st.markdown("**Measurement reliability**")
+        q1, q2 = st.columns(2)
+        q1.progress(min(max(float(res.coverage), 0.0), 1.0), text=f"Tracked frames · {res.coverage:.0%}")
+        q2.progress(min(max(float(res.mean_conf), 0.0), 1.0), text=f"Landmark confidence · {res.mean_conf:.0%}")
+        badge, badge_text = confidence_label(res)
+        html(f'<div class="callout"><b>{badge} · {badge_text}</b><br>Overall tracking confidence: {res.confidence:.0%}. SpyMotion uses only frames that pass its confidence gate; long gaps stay excluded rather than being guessed.</div>')
+
         with st.expander("View analysed video & movement trace", expanded=False):
             if entry["video"]:
                 st.video(entry["video"])
@@ -626,6 +727,117 @@ def result_panel(entry, ex, ymax, title, tag) -> None:
                 "Excursion = peak minus the start/end position of that rep. Movement units: "
                 "1 = one smooth lift; higher = more stepwise movement."
             )
+            st.caption(f"{res.n_reps} repetition(s) contributed to the displayed movement result. Low-confidence frames are not silently filled across long gaps.")
+        data_receipt(entry)
+
+
+def confidence_label(res) -> tuple[str, str]:
+    """Human-readable quality label without pretending confidence is clinical certainty."""
+    if res.status == "rejected":
+        return "WITHHELD", "Measurement withheld"
+    if res.status == "good" and res.confidence >= 0.85:
+        return "HIGH", "High tracking confidence"
+    if res.status == "good":
+        return "GOOD", "Good tracking confidence"
+    return "CAUTION", "Use with caution"
+
+
+def data_receipt(entry) -> None:
+    """Show exactly what a movement analysis keeps and discards."""
+    res = entry["res"]
+    with st.expander("🔐 Data receipt — what happened to this recording", expanded=False):
+        st.markdown("**Used for this analysis**")
+        st.markdown("""- Video frames, temporarily in memory / temporary processing files
+- Pose landmarks and tracking confidence
+- Joint-angle signal""")
+        st.markdown("**Not added to your progress history**")
+        st.markdown("""- Original video
+- Audio
+- Face image
+- Raw video frames""")
+        if res.status == "rejected":
+            st.markdown("**Saved movement result:** ❌ No — the measurement was withheld.")
+        elif st.session_state.get("privacy_mode", "Private mode") == "Private mode":
+            st.markdown("**Saved movement result:** ❌ No — Private mode is active.")
+        elif entry["key"] in st.session_state.get("saved", set()):
+            st.markdown("**Saved movement result:** ✅ Yes — numeric metrics only, after your explicit choice.")
+        else:
+            st.markdown("**Saved movement result:** ⏳ Not yet — Progress mode still requires you to choose **Save this result** below.")
+        st.caption("The analysed preview video is temporary. Face blur is best-effort; audio is removed from the result preview.")
+
+
+def save_result_control(entry, ex_key: str) -> None:
+    """Contextual, explicit consent for persistence of one latest reliable result."""
+    res = entry["res"]
+    if res.status == "rejected":
+        return
+    saved = st.session_state.setdefault("saved", set())
+    st.markdown("### Keep this result?")
+    if st.session_state.get("privacy_mode", "Private mode") != "Progress mode":
+        html('<div class="notice ok"><b class="t">Private mode is on</b>This result is not being added to your history. Switch to Progress mode in More → Settings if you want to save selected numeric results.</div>')
+        return
+    if entry["key"] in saved:
+        st.success("Saved to your progress history: numeric movement metrics only. The original video was not saved.")
+        return
+    st.caption("Saving is optional. SpyMotion will keep the exercise, side, date, ROM/repetition metrics and reliability values — not the original video, audio, face image or raw frames.")
+    if st.button("Save this result to my progress history", type="primary", use_container_width=True, key=f"save_result_{entry['key']}"):
+        if store.append_entry({"exercise": ex_key, "side": res.meta["side"], "label": "Latest video", **res.summary()}):
+            saved.add(entry["key"])
+            st.success("Saved. You can inspect, export or delete this session at any time in My Recovery.")
+            st.rerun()
+        else:
+            st.error("The result is still visible, but it could not be saved. Nothing was partially written.")
+
+
+def delete_history_entry(saved_at: str) -> bool:
+    """Delete one saved movement session while keeping the rest of the history."""
+    try:
+        rows = store.load_history()
+        kept = [r for r in rows if str(r.get("saved_at")) != str(saved_at)]
+        if len(kept) == len(rows):
+            return False
+        return bool(store._write_json_atomic(store.HISTORY, kept))
+    except Exception:
+        return False
+
+
+def clinician_summary_text(history: list[dict], exercise: str, side: str | None, limit: int = 10) -> str | None:
+    """Create a patient-controlled, observation-only summary for sharing with a clinician."""
+    df = history_frame(history)
+    included, excluded = sessions_for(df, exercise, side, limit)
+    summary = progress_summary(included, excluded, cfg.meaningful_change)
+    if summary is None:
+        return None
+    lines = [
+        "SpyMotion movement summary",
+        "==========================",
+        f"Exercise: {EXERCISES[exercise].label}",
+        f"Side: {summary.side.title()}",
+        f"Comparable sessions reviewed: {summary.total_sessions}",
+        f"Good-quality sessions included: {summary.included_sessions}",
+        f"Sessions excluded from trend for lower tracking quality: {summary.excluded_sessions}",
+        "",
+        f"Earlier-window average ROM: {summary.start_mean:.1f}°",
+        f"Recent-window average ROM: {summary.recent_mean:.1f}°",
+        f"Observed change: {summary.delta:+.1f}°",
+        f"Estimated trend per session: {summary.slope_per_session:+.1f}°",
+    ]
+    if summary.first_consistency_sd is not None and summary.recent_consistency_sd is not None:
+        lines += [
+            f"Earlier rep-to-rep spread: {summary.first_consistency_sd:.1f}°",
+            f"Recent rep-to-rep spread: {summary.recent_consistency_sd:.1f}°",
+        ]
+    if summary.confidence_mean is not None:
+        lines.append(f"Mean included-session tracking confidence: {summary.confidence_mean:.0%}")
+    lines += ["", "Observed patterns:"]
+    for _, title, text in insight_messages(summary, cfg.meaningful_change):
+        lines.append(f"- {title}: {text}")
+    lines += [
+        "",
+        "Important: SpyMotion reports movement observations from 2D video. It does not diagnose conditions, determine causes, or prescribe treatment.",
+        "Original rehabilitation videos are not included in this summary.",
+    ]
+    return "\n".join(lines)
 
 
 def range_bar(label: str, mean_peak: float, ex, old: bool = False) -> None:
@@ -639,6 +851,50 @@ def range_bar(label: str, mean_peak: float, ex, old: bool = False) -> None:
 def y_limit(*results) -> float:
     peaks = [r.peaks.max() for r in results if r.n_reps]
     return float(max(peaks + [30]) + 20)
+
+
+def progress_insight_panel(history: list[dict], exercise: str, side: str | None = None, limit: int = 10) -> None:
+    """Patient-facing longitudinal summary using only comparable, good-quality sessions."""
+    df = history_frame(history)
+    if df.empty:
+        st.info("Save movement numbers to build a personal recovery trend.")
+        return
+    included, excluded = sessions_for(df, exercise, side, limit)
+    summary = progress_summary(included, excluded, cfg.meaningful_change)
+    if summary is None:
+        n = len(included)
+        st.info(f"{n}/4 good-quality comparable sessions saved. Add {max(0, 4-n)} more to unlock progress insights.")
+        if len(excluded):
+            st.caption(f"{len(excluded)} fair-quality session(s) are kept in history but do not drive the trend claim.")
+        return
+
+    st.markdown(f"### Your last {summary.total_sessions} comparable sessions")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Recent average", f"{summary.recent_mean:.1f}°", f"{summary.delta:+.1f}° vs earlier")
+    c2.metric("Trend / session", f"{summary.slope_per_session:+.1f}°")
+    c3.metric("Included", f"{summary.included_sessions}/{summary.total_sessions}", help="Only good-quality sessions drive the trend.")
+
+    plot = pd.concat([included.assign(quality="Included"), excluded.assign(quality="Excluded: fair")]).sort_values("when")
+    base = alt.Chart(plot).encode(
+        x=alt.X("when:T", title="Session"),
+        y=alt.Y("mean_peak:Q", title="Average peak (°)", scale=alt.Scale(zero=False)),
+        tooltip=[alt.Tooltip("when:T", title="Date"), "exercise", "side",
+                 alt.Tooltip("mean_peak:Q", title="Peak", format=".1f"),
+                 alt.Tooltip("confidence:Q", title="Confidence", format=".0%"), "quality"],
+    )
+    line = alt.Chart(included).mark_line(strokeWidth=3, color="#0B6E3B").encode(
+        x="when:T", y=alt.Y("mean_peak:Q", scale=alt.Scale(zero=False)))
+    pts = base.mark_point(size=130, filled=True).encode(
+        color=alt.Color("quality:N", scale=alt.Scale(domain=["Included", "Excluded: fair"], range=["#0B6E3B", "#B45309"]), title="Trend use"),
+        shape=alt.Shape("quality:N", title="Trend use"),
+    )
+    st.altair_chart(themed(alt.layer(line, pts).properties(height=280)), use_container_width=True)
+    st.caption("Green sessions drive the trend. Fair-quality sessions stay visible but are excluded so uncertain tracking cannot create a false improvement.")
+
+    for kind, title, text in insight_messages(summary, cfg.meaningful_change):
+        cls = "ok" if kind == "positive" else "warn" if kind == "caution" else ""
+        html(f'<div class="notice {cls}"><b class="t">{title}</b>{text}</div>')
+    st.caption("These are observations from your saved movement measurements, not diagnoses or treatment recommendations.")
 
 
 # ------------------------------------------------------------------ main tab
@@ -675,7 +931,7 @@ with tab_main:
     with c2:
         up_after = st.file_uploader("Latest video", type=types, key="up_after")
 
-    st.caption("🔒 Processed locally. Your original video is temporary and is never kept. See More → Data & privacy for details.")
+    st.caption("🔒 Processed locally. Your original video is temporary and is never kept. " + ("Progress mode: you can explicitly save the numeric result after analysis." if save_history else "Private mode: no movement history is written."))
 
     step(3, "See your progress", "Everything is calculated here, on this device")
     go = st.button("Analyse on this device", type="primary", disabled=up_after is None, use_container_width=True)
@@ -761,6 +1017,7 @@ with tab_main:
                     html(f'<div class="tip"><span class="rule">{rid}</span><p>{text}</p></div>')
                 st.caption("Each tip shows the rule that produced it. No generative AI is used. "
                            "Tips would be reviewed by a clinician before real use.")
+            save_result_control(after, A["ex_key"])
         html(f'<div class="safety" role="note"><b>Safety.</b> {SAFETY_NOTE}</div>')
 
 # ------------------------------------------------------------------ history tab
@@ -773,21 +1030,22 @@ with tab_hist:
     hist = store.load_history()
     if not hist:
         html('<div class="grid">' + icard("\U0001F4D2", "Nothing saved yet",
-             text="Switch on <b>Save my movement numbers on this device</b> in More → Settings. Each analysis then adds one row of "
-                  "numbers here. You can download or delete it at any time.") + "</div>")
+             text="Switch to <b>Progress mode</b> in More → Settings, then explicitly save reliable results after analysis. Only numeric movement metrics are kept — never the original video.") + "</div>")
     else:
-        df = pd.DataFrame(hist)
-        for _c in ("exercise", "side", "label", "n_reps", "saved_at"):  # tolerate rows from older versions / hand edits
-            if _c not in df.columns:
-                df[_c] = None
-        df["mean_peak"] = pd.to_numeric(df.get("mean_peak"), errors="coerce")
-        df["when"] = pd.to_datetime(df["saved_at"], errors="coerce")
-        df = df.dropna(subset=["when", "mean_peak"]).reset_index(drop=True)
+        df = history_frame(hist)
+        st.markdown("#### Progress insights")
+        _available_ex = [k for k in EXERCISES if k in set(df["exercise"].dropna())]
+        _chosen_ex = st.selectbox("Movement to review", _available_ex, format_func=lambda k: EXERCISES[k].label, key="history_insight_ex")
+        _sides = [x for x in ("left", "right") if x in set(df.loc[df["exercise"] == _chosen_ex, "side"].dropna())]
+        _chosen_side = st.selectbox("Side", _sides, format_func=str.title, key="history_insight_side") if _sides else None
+        progress_insight_panel(hist, _chosen_ex, _chosen_side, 10)
+
+        st.markdown("#### All saved sessions")
         st.altair_chart(themed(
             alt.Chart(df).mark_line(point=alt.OverlayMarkDef(size=110), strokeWidth=3).encode(
                 x=alt.X("when:T", title="Date"), y=alt.Y("mean_peak:Q", title="Average peak (°)"),
                 color=alt.Color("exercise:N", scale=alt.Scale(range=["#0B3D2E", "#0B6E3B", "#16A34A", "#75B798"])),
-                tooltip=["exercise", "side", "mean_peak", "n_reps", "label"]).properties(height=300)),
+                tooltip=["exercise", "side", "mean_peak", "n_reps", "status", "confidence", "label"]).properties(height=300)),
             use_container_width=True)
         _diary = store.load_prom()[0]
         if _diary:
@@ -812,6 +1070,38 @@ with tab_hist:
         st.download_button("Download my data (CSV)", df.drop(columns=["when"]).to_csv(index=False),
                            "spymotion_history.csv", "text/csv")
         st.caption("This file lives only in the local folder shown in More → Data & privacy. It is yours.")
+
+        st.markdown("#### Share an observation summary")
+        _clinician = clinician_summary_text(hist, _chosen_ex, _chosen_side, 10)
+        if _clinician:
+            st.download_button(
+                "Generate clinician summary",
+                _clinician,
+                file_name=f"spymotion_{_chosen_ex}_{_chosen_side or 'side'}_summary.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+            st.caption("You choose whether to share it. It contains movement observations and reliability information — no original video and no diagnosis.")
+        else:
+            st.caption("Save at least four good-quality comparable sessions to generate a trend summary.")
+
+        with st.expander("Manage & delete individual sessions", expanded=False):
+            _rows = list(reversed(hist))
+            _labels = []
+            for _r in _rows:
+                _exercise_label = EXERCISES.get(_r.get("exercise")).label if _r.get("exercise") in EXERCISES else str(_r.get("exercise", "Movement"))
+                _peak = _r.get("mean_peak")
+                _peak_txt = f"{float(_peak):.0f}°" if isinstance(_peak, (int, float)) else "result"
+                _labels.append(f"{_r.get('saved_at', 'Unknown date')} · {_exercise_label} · {str(_r.get('side', '')).title()} · {_peak_txt}")
+            _pick = st.selectbox("Saved session", range(len(_rows)), format_func=lambda i: _labels[i], key="delete_history_pick")
+            _chosen_row = _rows[_pick]
+            st.caption("Deleting one session removes only that row of derived movement metrics. There is no stored original video to delete from history.")
+            if st.button("🗑 Delete this saved session", use_container_width=True, key="delete_one_history"):
+                if delete_history_entry(str(_chosen_row.get("saved_at"))):
+                    st.success("Session deleted.")
+                    st.rerun()
+                else:
+                    st.error("That session could not be deleted. No other history was changed.")
 
 # ------------------------------------------------------------------ data & safety tab
 # ======================================================================
@@ -851,6 +1141,37 @@ with tab_data:
              "Typical-range values are textbook averages for uninjured adults."])
          + "</div>")
 
+    st.markdown("### Your data journey")
+    st.markdown(
+        "**Video selected** → **processed locally** → **pose landmarks + movement signal calculated** → "
+        "**original upload discarded** → **result shown** → "
+        "**numeric metrics saved only if you choose Progress mode and press Save this result**"
+    )
+    st.caption("Data minimisation by design: SpyMotion keeps only what is needed for the experience you choose.")
+
+    st.markdown("### What can be saved")
+    _d1, _d2 = st.columns(2)
+    with _d1:
+        st.markdown("**✅ Numeric progress data (only with explicit save)**")
+        st.markdown("""- Exercise + side
+- Date/time
+- ROM / repetition metrics
+- Tracking coverage + confidence
+- Movement-quality summary metrics""")
+    with _d2:
+        st.markdown("**❌ Not saved to progress history**")
+        st.markdown("""- Original rehabilitation video
+- Audio
+- Face image
+- Raw video frames
+- A clinical diagnosis""")
+
+    _mode = st.session_state.get("privacy_mode", "Private mode")
+    html(f'<div class="notice ok"><b class="t">Current mode: {_mode}</b>' + (
+        'Selected results may be saved only when you explicitly press Save this result.' if _mode == 'Progress mode' else
+        'Movement results are session-only; no movement history is written.'
+    ) + '</div>')
+
     st.markdown("### What this app holds right now")
     files = store.audit()
     if files:
@@ -860,11 +1181,32 @@ with tab_data:
     st.caption(f"Data folder: {store.DATA_DIR} · Temp folder: {store.TMP}")
 
     report = Path(__file__).with_name("validation_report.md")
+    report_csv = Path(__file__).with_name("validation_report.csv")
     st.markdown("### Validation & fairness testing")
     if report.exists():
-        st.markdown(report.read_text())
+        st.markdown(report.read_text(encoding="utf-8"))
+        if report_csv.exists():
+            _val = pd.read_csv(report_csv)
+            _val["manual_peak_deg"] = pd.to_numeric(_val.get("manual_peak_deg"), errors="coerce")
+            _val["app_peak_deg"] = pd.to_numeric(_val.get("app_peak_deg"), errors="coerce")
+            _scored = _val.dropna(subset=["manual_peak_deg", "app_peak_deg"])
+            if len(_scored):
+                st.markdown("#### App measurement vs reference")
+                _max = float(max(_scored["manual_peak_deg"].max(), _scored["app_peak_deg"].max()) + 10)
+                _scatter = alt.Chart(_scored).mark_circle(size=130, color="#0B6E3B").encode(
+                    x=alt.X("manual_peak_deg:Q", title="Reference angle (°)", scale=alt.Scale(domain=[0, _max])),
+                    y=alt.Y("app_peak_deg:Q", title="SpyMotion angle (°)", scale=alt.Scale(domain=[0, _max])),
+                    tooltip=["file", "exercise", "condition", "manual_peak_deg", "app_peak_deg", "coverage", "confidence"],
+                )
+                _ideal = alt.Chart(pd.DataFrame({"x": [0, _max], "y": [0, _max]})).mark_line(
+                    strokeDash=[5, 5], color="#6B7F74").encode(x="x:Q", y="y:Q")
+                st.altair_chart(themed(alt.layer(_ideal, _scatter).properties(height=300)), use_container_width=True)
+                st.caption("Dashed line = perfect agreement. Each dot is a labelled clip with a manual reference measurement.")
+            with st.expander("See clip-by-clip validation data", expanded=False):
+                st.dataframe(_val, hide_index=True, use_container_width=True)
     else:
-        st.caption("Run `python validate.py` on your labelled clips to show validation results here.")
+        st.info("No real validation dataset has been run yet. Add labelled clips and run `python validate.py --csv labels.csv --videos clips/` — SpyMotion will show the results here automatically.")
+        st.caption("Do not replace this with invented numbers: real clips, including difficult conditions, make the responsible-AI story much stronger.")
     stress = Path(__file__).with_name("stress_report.md")
     if stress.exists():
         st.markdown(stress.read_text(encoding="utf-8"))
