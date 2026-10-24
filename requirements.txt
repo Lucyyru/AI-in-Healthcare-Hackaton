@@ -1,0 +1,8 @@
+# Python 3.9 - 3.12.  Legacy mp.solutions API is required, so mediapipe is pinned.
+mediapipe==0.10.14
+numpy<2
+scipy>=1.10
+pandas>=2.0
+streamlit>=1.38,<1.50
+altair>=5,<6
+imageio-ffmpeg>=0.4.9

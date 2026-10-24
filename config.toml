@@ -1,0 +1,13 @@
+[theme]
+base = "light"
+primaryColor = "#0B6E3B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F6F3"
+textColor = "#111111"
+
+[browser]
+gatherUsageStats = false   # no telemetry: the app makes no outbound network calls
+
+[server]
+maxUploadSize = 200
+headless = false
