@@ -89,7 +89,7 @@ def movement_value(raw_angle: np.ndarray, ex: Exercise) -> np.ndarray:
 # --------------------------------------------------------------------------
 @dataclass(frozen=True)
 class SignalConfig:
-    conf_thresh: float = 0.5  # per-frame landmark visibility gate
+    conf_thresh: float = 0.4  # per-frame landmark visibility gate; tolerant enough for rehab/seated footage
     max_gap_s: float = 0.5  # longest gap we are willing to bridge
     smooth_s: float = 0.3  # Savitzky-Golay window
     min_prominence: float = 8.0  # degrees; smaller wiggles are not counted as reps
@@ -186,8 +186,8 @@ def process_signal(
 
     if valid.sum() < max(10, int(fps)):
         res.reasons.append(
-            "Your body was not tracked reliably (too few usable frames). "
-            "Make sure your whole body is in view, with good light."
+            "The joints needed for this movement were not tracked reliably (too few usable frames). "
+            "Keep the joint and the body segments on both sides of it clearly in view, with good light."
         )
         return res
 

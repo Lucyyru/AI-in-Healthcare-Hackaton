@@ -97,8 +97,8 @@ def extract_landmarks(path: str, fps: float, n_est: int, model_complexity: int, 
         static_image_mode=False,
         model_complexity=model_complexity,
         smooth_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5,
+        min_detection_confidence=0.4,
+        min_tracking_confidence=0.4,
     ) as pose:
         for i, frame in enumerate(iter_frames(path, max_frames)):
             if size is None:
@@ -232,7 +232,13 @@ def analyze_video(
 
     angles = {s: compute_angles(lms, ex, s, size) for s in ("left", "right")}
     if side == "auto":
-        side = max(("left", "right"), key=lambda s: float(((angles[s][1] >= cfg.conf_thresh)).mean()))
+        # Prefer the side with the most frames above the reliability gate. If both sides
+        # have the same coverage, use mean landmark visibility as the tie-breaker.
+        def side_quality(s: str) -> tuple[float, float]:
+            conf = angles[s][1]
+            return float((conf >= cfg.conf_thresh).mean()), float(np.nanmean(conf))
+
+        side = max(("left", "right"), key=side_quality)
     movement, conf = angles[side]
     vr = view_ratio(lms, size)
 

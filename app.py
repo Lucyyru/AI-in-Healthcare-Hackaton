@@ -687,6 +687,11 @@ def result_panel(entry, ex, ymax, title, tag) -> None:
 
         if res.status == "rejected":
             st.caption("No movement score is shown because the recording did not meet SpyMotion’s reliability checks.")
+            if res.meta.get("frames", 0):
+                st.caption(
+                    f"Debug: {res.coverage:.0%} of frames passed the {cfg.conf_thresh:.0%} landmark-confidence gate "
+                    f"({res.meta.get('frames', 0)} frames analysed)."
+                )
             if entry["video"]:
                 with st.expander("View the analysed recording", expanded=False):
                     st.video(entry["video"])
