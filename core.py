@@ -1,5 +1,5 @@
 """
-core.py - SpineMotion analysis engine.
+core.py - SpyMotion analysis engine.
 
 Pure NumPy/SciPy: no video, no UI, no network. Everything here is deterministic
 and unit-tested, so every number the patient sees can be traced back to a rule.
@@ -256,6 +256,12 @@ def process_signal(
         )
     if dropped:
         res.warnings.append(f"{dropped} repetition(s) were ignored because tracking was lost at the top of the movement.")
+    lost_s = float((~reliable).sum() / fps)
+    if lost_s >= 1.0:  # a lost stretch can hide whole repetitions, so never stay silent about it
+        res.warnings.append(
+            f"About {lost_s:.0f} s of the video could not be tracked and was ignored; "
+            "any repetition in that stretch is not counted."
+        )
     if res.coverage < cfg.good_coverage and res.coverage >= cfg.min_coverage:
         res.warnings.append(f"Tracking covered {res.coverage:.0%} of frames; results are less certain.")
     if cfg.min_reps <= len(reps) < cfg.good_reps:
@@ -325,7 +331,7 @@ def percent_of_typical(mean_peak: float, ex: Exercise) -> float:
 # Rule-based tips (deterministic, auditable, no LLM)
 # --------------------------------------------------------------------------
 SAFETY_NOTE = (
-    "SpineMotion is a self-monitoring aid, not a medical device or a diagnosis. "
+    "SpyMotion is a self-monitoring aid, not a medical device or a diagnosis. "
     "Stop if you feel pain, dizziness or anything unusual. If you have a spinal cord injury and "
     "get a sudden pounding headache, flushing or sweating, these can be signs of autonomic "
     "dysreflexia: stop and seek urgent medical help."

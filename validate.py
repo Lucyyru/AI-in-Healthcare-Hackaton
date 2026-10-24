@@ -30,6 +30,12 @@ def main():
     args = ap.parse_args()
 
     df = pd.read_csv(args.csv)
+    missing = {"file", "exercise", "manual_peak_deg"} - set(df.columns)
+    if missing:
+        raise SystemExit(f"labels.csv is missing required column(s): {sorted(missing)}")
+    if "condition" not in df.columns:
+        df["condition"] = "unspecified"
+    df["condition"] = df["condition"].fillna("unspecified")
     rows = []
     for r in df.to_dict("records"):
         side = r.get("side") if isinstance(r.get("side"), str) else "auto"

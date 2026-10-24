@@ -1,9 +1,11 @@
 """
 pose_pipeline.py - video in, SignalResult + privacy-preserving overlay video out.
 
-Runs entirely on-device with MediaPipe Pose (model weights ship inside the pip package,
-so there is no download and no network call). Inference runs once per frame; the overlay
-is rendered from the stored landmarks, so no second pass of the model is needed.
+Runs entirely on-device with MediaPipe Pose. Only the standard model (model_complexity=1)
+ships inside the pip package. The 'lite' (0) and 'heavy' (2) models are downloaded from Google
+Cloud Storage the first time they are used, which would break the on-device / offline promise,
+so any other value is forced to 1. Inference runs once per frame; the overlay is rendered from
+the stored landmarks, so no second pass of the model is needed.
 """
 from __future__ import annotations
 
@@ -24,6 +26,7 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 GREEN, ORANGE, WHITE, GREY = (90, 200, 60), (0, 150, 255), (255, 255, 255), (200, 200, 200)
 
 Progress = Optional[Callable[[float, str], None]]
+BUNDLED_COMPLEXITY = 1  # the only pose model that needs no download
 
 
 # ---------------------------------------------------------------- video helpers
@@ -86,6 +89,7 @@ def extract_landmarks(path: str, fps: float, n_est: int, model_complexity: int, 
     """Return landmarks (N, 33, 3) = x, y (normalised), visibility; and the frame size."""
     import mediapipe as mp
 
+    model_complexity = BUNDLED_COMPLEXITY  # never trigger a network download
     mp_pose = mp.solutions.pose
     max_frames = int(fps * MAX_SECONDS)
     out, size = [], None

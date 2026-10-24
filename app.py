@@ -1,4 +1,4 @@
-"""SpineMotion - patient-owned, on-device movement progress tracking.  Run: streamlit run app.py"""
+"""SpyMotion - patient-owned, on-device movement progress tracking.  Run: streamlit run app.py"""
 
 # CODE MAP / QUICK NAVIGATION
 # 1. Imports and app setup              -> dependencies and Streamlit page settings
@@ -32,9 +32,14 @@ import streamlit as st
 import core
 import store
 from core import CFG, EXERCISES, SAFETY_NOTE, SignalConfig, build_tips, compare, percent_of_typical
-from pose_pipeline import analyze_video
+from robust import analyze_upload
 
-st.set_page_config(page_title="SpineMotion", page_icon="\U0001F9B4", layout="wide")
+st.set_page_config(
+    page_title="SpyMotion",
+    page_icon="\U0001F9B4",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 # ======================================================================
 # VISUALS AREA 1/2: GLOBAL DESIGN SYSTEM
@@ -52,7 +57,14 @@ CSS = """
 }
 html, body, [class*="css"], .stApp { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--ink); }
 .stApp { background: radial-gradient(1100px 420px at 85% -80px, #D9F0E0 0%, rgba(217,240,224,0) 70%), linear-gradient(180deg,#F3F8F4 0,#FFFFFF 520px); }
-.block-container { max-width: 1180px; padding-top: 1.2rem; padding-bottom: 4rem; }
+.block-container {
+    max-width: 600px;
+    padding-top: 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 4rem;
+    margin: 0 auto;
+}
 #MainMenu, footer { visibility: hidden; }
 header[data-testid="stHeader"] { background: transparent; }
 h1,h2,h3 { letter-spacing: -0.02em; color: var(--ink); }
@@ -60,11 +72,30 @@ p, li { line-height: 1.6; }
 :focus-visible { outline: 3px solid var(--g700) !important; outline-offset: 2px; border-radius: 8px; }
 
 /* VISUALS: main hero/banner at the top of the app */
-.hero{ background: linear-gradient(135deg,#0B3D2E 0%,#0B6E3B 60%,#16A34A 120%); color:#fff; border-radius:28px; padding:2.2rem 2.4rem 1.8rem; box-shadow: var(--shadow); position:relative; overflow:hidden; margin-bottom:1.4rem;}
+.hero{
+    background: linear-gradient(135deg,#0B3D2E 0%,#0B6E3B 60%,#16A34A 120%);
+    color:#fff;
+    border-radius:20px;
+    padding:1.4rem 1.2rem;
+    box-shadow:var(--shadow);
+    position:relative;
+    overflow:hidden;
+    margin-bottom:1rem;
+}
 .hero:after{ content:""; position:absolute; right:-70px; top:-70px; width:300px; height:300px; border-radius:50%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.22), rgba(255,255,255,0) 70%);}
 .brand{ display:flex; align-items:center; gap:.7rem; font-weight:700; font-size:1.05rem; letter-spacing:.02em; opacity:.95;}
-.hero h1{ color:#fff; font-size:2.7rem; line-height:1.1; margin:.9rem 0 .5rem; font-weight:800; max-width:760px;}
-.hero p{ color:#E3F4E8; font-size:1.15rem; max-width:680px; margin:0 0 1.2rem;}
+.hero h1{
+    color:#fff;
+    font-size:2rem;
+    line-height:1.1;
+    margin:.7rem 0 .4rem;
+    font-weight:800;
+}
+.hero p{
+    color:#E3F4E8;
+    font-size:1rem;
+    margin:0 0 1rem;
+}
 .pills{ display:flex; flex-wrap:wrap; gap:.5rem; position:relative; z-index:1;}
 .pill{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.35); color:#fff; padding:.35rem .85rem; border-radius:999px; font-size:.92rem; font-weight:600; backdrop-filter: blur(4px);}
 
@@ -116,7 +147,12 @@ p, li { line-height: 1.6; }
 .rule{ flex:0 0 auto; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.78rem; font-weight:700; padding:.2rem .55rem; border-radius:8px; background:var(--mint); color:var(--g700); margin-top:.1rem;}
 
 /* VISUALS: informational cards and how-it-works grid */
-.grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1rem; margin:.6rem 0;}
+.grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:.8rem;
+    margin:.6rem 0;
+}
 .icard{ background:#fff; border:1px solid var(--line); border-radius:20px; padding:1.2rem 1.3rem; box-shadow:var(--shadow);}
 .icard .ic{ width:2.6rem; height:2.6rem; border-radius:14px; background:var(--mint); display:grid; place-items:center; font-size:1.3rem; margin-bottom:.6rem;}
 .icard h3{ margin:.1rem 0 .4rem; font-size:1.15rem; font-weight:800;}
@@ -190,7 +226,7 @@ label[data-baseweb="radio"]:has(input:checked) *{color:#fff !important;font-weig
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
 /* VISUAL REFINEMENT: SOFT GREEN PALETTE + ROUNDED CONTROLS
-   Keep all interactive elements within SpineMotion's calm green design system.
+   Keep all interactive elements within SpyMotion's calm green design system.
    This final override block is intentionally centralised for easy future editing. */
 :root{
   --ink:#15382B; --muted:#61766A; --line:#D7E6DA; --mint:#E8F4EB; --mint2:#F5F9F5;
@@ -243,12 +279,22 @@ label[data-baseweb="radio"]:has(input:focus-visible){outline:3px solid #75B798;o
 div[data-baseweb="tab-list"]{background:#EAF4EC;border:1px solid #D7E6DA;}
 button[data-baseweb="tab"][aria-selected="true"]{color:#176B43;}
 @media (max-width:760px){.stButton > button{min-height:2.7rem;padding:.45rem .85rem;}label[data-baseweb="radio"]{padding:.4rem .7rem !important;}}
+/* Accessibility/mobile behaviour retained from the compact app version. */
+@media (max-width:600px){
+  html, body, [class*="css"] { font-size:18px; }
+  .block-container { max-width:600px; padding-left:.8rem; padding-right:.8rem; }
+  .stButton > button { width:100%; min-height:3.5rem; font-size:1.1rem; font-weight:600; }
+  [data-testid="stFileUploader"] { padding:.5rem 0; }
+  [data-testid="stMetricValue"] { font-size:2rem; }
+  h1 { font-size:2rem !important; }
+  h2 { font-size:1.4rem !important; }
+}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
 LOGO = (
-    '<svg width="34" height="34" viewBox="0 0 34 34" role="img" aria-label="SpineMotion logo">'
+    '<svg width="34" height="34" viewBox="0 0 34 34" role="img" aria-label="SpyMotion logo">'
     '<rect width="34" height="34" rx="10" fill="rgba(255,255,255,.16)"/>'
     '<rect x="12" y="5" width="10" height="5" rx="2.5" fill="#fff"/>'
     '<rect x="11" y="11.5" width="12" height="5" rx="2.5" fill="#fff" opacity=".9"/>'
@@ -281,36 +327,123 @@ def themed(chart):
     )
 
 
+# ------------------------------------------------------------------ sidebar
 # ======================================================================
 # SIDEBAR AREA: PRIVACY CONTROLS AND ADVANCED SETTINGS
 # Edit sidebar controls here; processing uses their values below.
 # ====================================================================== sidebar
 with st.sidebar:
-    html(f'<div class="brand">{LOGO.replace("rgba(255,255,255,.16)", "#0B6E3B")}<span>SpineMotion</span></div>')
+    html(f'<div class="brand">{LOGO.replace("rgba(255,255,255,.16)", "#0B6E3B")}<span>SpyMotion</span></div>')
+    st.markdown("### Display")
+
+    view_mode = st.radio(
+        "Choose how SpyMotion looks",
+        ["📱 Phone", "🖥️ Website"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="view_mode",
+    )
+    st.divider()
     st.caption("Your movement. Your data. Your device.")
     blur_face = st.toggle("Blur my face in the result video", value=True)
     save_history = st.toggle("Save my numbers on this device (never video)", value=False)
+    show_medication = st.toggle("Show optional medication & routines tab", value=False,
+                                help="Off by default to keep the app focused on movement. Entries stay on this device and are deleted by Delete everything.")
     with st.expander("Advanced settings"):
         conf_thresh = st.slider("Minimum tracking confidence per frame", 0.3, 0.9, CFG.conf_thresh, 0.05,
                                 help="Frames below this are ignored, not guessed.")
         min_prom = st.slider("Smallest movement counted as a repetition (°)", 4, 20, int(CFG.min_prominence))
-        complexity = st.selectbox("Pose model size", [0, 1, 2], index=1,
-                                  help="0 = fastest, 2 = most accurate (slower).")
+        complexity = 1  # the only pose model bundled in the package; 0 and 2 download from Google at first use
+        st.caption("Pose model: MediaPipe Pose (standard), bundled with the app. It never downloads anything.")
     st.divider()
     if st.button("\U0001F5D1  Delete everything now", use_container_width=True):
-        removed = store.delete_everything()
+        _rep = store.delete_everything_report()
         st.session_state.clear()
-        st.success(f"Deleted {removed} file(s) and cleared this session.")
-    st.caption("Wipes saved numbers, result videos and everything held in memory.")
+        if _rep["failed"]:
+            st.error(f"Deleted {_rep['deleted']} file(s) but could not remove {len(_rep['failed'])}: "
+                     + ", ".join(Path(f).name for f in _rep["failed"]))
+        else:
+            st.success(f"Deleted {_rep['deleted']} file(s) and cleared this session.")
+    st.caption("Wipes saved numbers, the wellbeing diary, result videos and everything held in memory.")
 
 cfg = SignalConfig(conf_thresh=float(conf_thresh), min_prominence=float(min_prom))
+# ======================================================================
+# DISPLAY MODE
+# Phone mode keeps the interface narrow and app-like.
+# Website mode uses the available desktop width.
+# ======================================================================
 
+if view_mode == "📱 Phone":
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 600px !important;
+            margin: 0 auto !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+
+        .grid {
+            grid-template-columns: 1fr !important;
+        }
+
+        .hero {
+            padding: 1.4rem 1.2rem !important;
+            border-radius: 20px !important;
+        }
+
+        .hero h1 {
+            font-size: 2rem !important;
+        }
+
+        .hero p {
+            font-size: 1rem !important;
+        }
+
+        .stats {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+else:
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 1180px !important;
+            margin: 0 auto !important;
+        }
+
+        .grid {
+            grid-template-columns:
+                repeat(auto-fit, minmax(250px, 1fr)) !important;
+        }
+
+        .hero {
+            padding: 2.2rem 2.4rem 1.8rem !important;
+        }
+
+        .hero h1 {
+            font-size: 2.7rem !important;
+        }
+
+        .hero p {
+            font-size: 1.15rem !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 # ======================================================================
 # HEADER / NAVIGATION AREA: BRAND BANNER AND TOP-LEVEL TABS
 # Change the page intro and tab names here.
 # ====================================================================== hero
 html(
-    f'<div class="hero"><div class="brand">{LOGO}<span>SpineMotion</span></div>'
+    f'<div class="hero"><div class="brand">{LOGO}<span>SpyMotion</span></div>'
     "<h1>See your recovery, privately.</h1>"
     "<p>Film an exercise. Get your range of motion for every repetition and a clear before-and-after, "
     "calculated entirely on this device.</p>"
@@ -318,9 +451,16 @@ html(
     '<span class="pill">\U0001F464 No accounts</span><span class="pill">\U0001F3AC Original video never saved</span>'
     '<span class="pill">\U0001F6D1 Refuses to score when unsure</span></div></div>'
 )
-tab_main, tab_hist, tab_prom, tab_data = st.tabs(["Check my progress", "My history", "Daily wellbeing", "Data & safety"])
+_tab_labels = ["Check my progress", "My history", "Daily wellbeing"]
+if show_medication:
+    _tab_labels.append("Medication & routines")
+_tab_labels.append("Data & safety")
+_tabs = st.tabs(_tab_labels)
+tab_main, tab_hist, tab_prom = _tabs[0], _tabs[1], _tabs[2]
+tab_medication = _tabs[3] if show_medication else None
+tab_data = _tabs[-1]
 
-
+# ------------------------------------------------------------------ helpers
 # ======================================================================
 # ANALYSIS HELPER AREA: VIDEO PROCESSING AND REUSABLE RESULT UI
 # Functions below are called by the main exercise-analysis tab.
@@ -331,27 +471,25 @@ def run_one(upl, ex_key: str, side: str, label: str) -> dict:
     cache = st.session_state.setdefault("cache", {})
     if key in cache:
         return cache[key]
-    tmp = store.tmp_dir()
-    src = tmp / f"in_{key[:8]}{Path(upl.name).suffix or '.mp4'}"
-    out = tmp / f"result_{key[:8]}.mp4"
-    src.write_bytes(data)
     bar = st.progress(0.0, text=f"{label}: starting")
     try:
-        res = analyze_video(
-            str(src), ex_key, side, cfg, blur_face, complexity, str(out),
+        # never raises for bad input; the original footage is always removed afterwards
+        res, video = analyze_upload(
+            data, Path(upl.name).suffix, key[:8], ex_key, side, cfg, blur_face, complexity,
             progress=lambda f, t: bar.progress(min(f, 1.0), text=f"{label}: {t}"),
         )
     finally:
-        src.unlink(missing_ok=True)  # original footage is never kept
         bar.empty()
-    video = out.read_bytes() if out.exists() else None
     entry = {"res": res, "video": video, "label": label, "key": key}
-    cache[key] = entry
+    if not res.meta.get("failed"):  # do not cache a failure: a retry should really retry
+        cache[key] = entry
     if save_history and res.status != "rejected":
         saved = st.session_state.setdefault("saved", set())
         if key not in saved:
-            store.append_entry({"exercise": ex_key, "side": res.meta["side"], "label": label, **res.summary()})
-            saved.add(key)
+            if store.append_entry({"exercise": ex_key, "side": res.meta["side"], "label": label, **res.summary()}):
+                saved.add(key)
+            else:
+                st.warning("Your result is shown, but it could not be saved to your history (disk problem).")
     return entry
 
 
@@ -359,7 +497,7 @@ def banner(res) -> None:
     if res.status == "rejected":
         items = "".join(f"<li>{r}</li>" for r in res.reasons)
         html(f'<div class="notice bad" role="alert"><b class="t">We can’t score this video reliably</b><ul>{items}</ul>'
-             "<div style='margin-top:.5rem'>Rather than guess, SpineMotion shows no score. "
+             "<div style='margin-top:.5rem'>Rather than guess, SpyMotion shows no score. "
              "Check the filming checklist and try again.</div></div>")
     elif res.status == "fair":
         items = "".join(f"<li>{w}</li>" for w in res.warnings)
@@ -442,6 +580,7 @@ def y_limit(*results) -> float:
     return float(max(peaks + [30]) + 20)
 
 
+# ------------------------------------------------------------------ main tab
 # ======================================================================
 # EXERCISE ANALYSIS AREA: EXERCISE CHOICE, VIDEO UPLOAD, RESULTS AND TIPS
 # Main workflow for analysing movement videos.
@@ -501,7 +640,7 @@ with tab_main:
         rb = before["res"] if before else None
 
         before_ok = True
-        if before and rb.meta["side"] != ra.meta["side"]:
+        if before and rb.status != "rejected" and ra.status != "rejected" and rb.meta["side"] != ra.meta["side"]:
             html('<div class="notice warn" role="alert"><b class="t">Different limbs tracked</b>'
                  "The two videos tracked different limbs, so they can’t be compared fairly. "
                  "Choose Left or Right above and analyse again.</div>")
@@ -560,6 +699,7 @@ with tab_main:
                        "Tips would be reviewed by a clinician before real use.")
         html(f'<div class="safety" role="note"><b>Safety.</b> {SAFETY_NOTE}</div>')
 
+# ------------------------------------------------------------------ history tab
 # ======================================================================
 # MOVEMENT HISTORY AREA: SAVED ANALYSIS TABLE, TREND CHART AND CSV EXPORT
 # This section reads movement-analysis history from store.py.
@@ -573,18 +713,43 @@ with tab_hist:
                   "numbers here. You can download or delete it at any time.") + "</div>")
     else:
         df = pd.DataFrame(hist)
-        df["when"] = pd.to_datetime(df["saved_at"])
+        for _c in ("exercise", "side", "label", "n_reps", "saved_at"):  # tolerate rows from older versions / hand edits
+            if _c not in df.columns:
+                df[_c] = None
+        df["mean_peak"] = pd.to_numeric(df.get("mean_peak"), errors="coerce")
+        df["when"] = pd.to_datetime(df["saved_at"], errors="coerce")
+        df = df.dropna(subset=["when", "mean_peak"]).reset_index(drop=True)
         st.altair_chart(themed(
             alt.Chart(df).mark_line(point=alt.OverlayMarkDef(size=110), strokeWidth=3).encode(
                 x=alt.X("when:T", title="Date"), y=alt.Y("mean_peak:Q", title="Average peak (°)"),
                 color=alt.Color("exercise:N", scale=alt.Scale(range=["#0B3D2E", "#0B6E3B", "#16A34A", "#75B798"])),
                 tooltip=["exercise", "side", "mean_peak", "n_reps", "label"]).properties(height=300)),
             use_container_width=True)
+        _diary = store.load_prom()[0]
+        if _diary:
+            _daily = df.assign(day=df["when"].dt.strftime("%Y-%m-%d")).groupby("day", as_index=False)["mean_peak"].mean()
+            _feel = pd.DataFrame([{"day": d, "Pain": e.get("pain"), "Fatigue": e.get("fatigue")}
+                                  for d, e in _diary.items() if isinstance(e, dict)])
+            if not _feel.empty:
+                _feel[["Pain", "Fatigue"]] = _feel[["Pain", "Fatigue"]].apply(pd.to_numeric, errors="coerce")
+                _both = _daily.merge(_feel, on="day", how="inner")
+                if len(_both) >= 2:
+                    st.markdown("#### Movement and how you felt")
+                    _top = alt.Chart(_both).mark_line(point=True, strokeWidth=3, color="#0B6E3B").encode(
+                        x=alt.X("day:T", title=None), y=alt.Y("mean_peak:Q", title="Average peak (°)")).properties(height=150)
+                    _long = _both.melt(id_vars="day", value_vars=["Pain", "Fatigue"], var_name="Symptom", value_name="Score")
+                    _bottom = alt.Chart(_long).mark_line(point=True, strokeWidth=3).encode(
+                        x=alt.X("day:T", title="Date"),
+                        y=alt.Y("Score:Q", title="Score (0–10)", scale=alt.Scale(domain=[0, 10])),
+                        color=alt.Color("Symptom:N", scale=alt.Scale(range=["#C2410C", "#6B7F74"]))).properties(height=150)
+                    st.altair_chart(themed(alt.vconcat(_top, _bottom)), use_container_width=True)
+                    st.caption("Days where you logged both. This shows patterns only; it cannot show what causes what.")
         st.dataframe(df.drop(columns=["when"]), hide_index=True, use_container_width=True)
         st.download_button("Download my data (CSV)", df.drop(columns=["when"]).to_csv(index=False),
-                           "spinemotion_history.csv", "text/csv")
+                           "spymotion_history.csv", "text/csv")
         st.caption("This file lives only in the folder shown in the Data & safety tab. It is yours.")
 
+# ------------------------------------------------------------------ data & safety tab
 # ======================================================================
 # DATA & SAFETY AREA: PRIVACY EXPLANATION, FILE AUDIT AND VALIDATION REPORT
 # Edit user-facing safety/limitations text and data inventory here.
@@ -598,15 +763,15 @@ with tab_data:
              "All analysis runs on this device: no uploads, accounts, cloud or API calls.",
              "Your <b>original video is never saved</b>; it is analysed and discarded.",
              "The result video is temporary, with the <b>face blurred</b> and <b>audio removed</b>.",
-             "Numbers are saved only if you switch that on. <b>Delete everything</b> wipes it all."])
+             "Movement numbers are saved only if you switch that on; diary entries only when you press Save. <b>Delete everything</b> wipes all of it, and the list below proves it."])
          + icard("\U0001F6E1️", "Security", [
              "No server and no network service: no remote attack surface and no data in transit.",
              "Files live in one folder; the list below shows exactly what is held right now.",
-             "Honest limit: saved history is not encrypted, so protect your device with a passcode."])
+             "Honest limit: saved history and diary entries are not encrypted, so protect your device with a passcode."])
          + icard("⚖️", "Fairness", [
              "Pose models are mostly trained on able-bodied people, so they can be <b>less accurate for seated, "
              "wheelchair or assisted postures</b>, other body shapes, dark clothing and poor light.",
-             "So SpineMotion checks its own reliability and <b>refuses to score</b> instead of guessing.",
+             "So SpyMotion checks its own reliability and <b>refuses to score</b> instead of guessing.",
              "We tested across conditions and publish where it fails (below)."])
          + icard("\U0001F50D", "Transparency", [
              "Every number can be expanded: per-rep peaks, tracking coverage, confidence.",
@@ -636,6 +801,9 @@ with tab_data:
         st.markdown(report.read_text())
     else:
         st.caption("Run `python validate.py` on your labelled clips to show validation results here.")
+    stress = Path(__file__).with_name("stress_report.md")
+    if stress.exists():
+        st.markdown(stress.read_text(encoding="utf-8"))
     html(f'<div class="safety" role="note"><b>Safety.</b> {SAFETY_NOTE}</div>')
 
 
@@ -645,7 +813,8 @@ with tab_data:
 # ====================================================================== patient-reported outcomes (PROMs)
 # Local JSON storage: entries stay in this app folder; this prototype has no cloud sync.
 # PROM STORAGE: local JSON file path and default values for a new daily entry.
-PROM_FILE = Path(__file__).with_name("spinemotion_prom_entries.json")
+# The diary lives in store.py (DATA_DIR/wellbeing_entries.json): atomic writes, owner-only permissions,
+# listed in the Data & safety audit and wiped by "Delete everything".
 
 PROM_DEFAULTS = {
     "pain": 0,
@@ -655,6 +824,7 @@ PROM_DEFAULTS = {
     "mood": 3,
     "overall_wellbeing": 3,
     "medication": "Not applicable",
+    "medication_missed_reason": "",
     "rehab_activity": "Not recorded",
     "notes": "",
     "pain_location": [],
@@ -669,16 +839,15 @@ PROM_DEFAULTS = {
 
 # PROM STORAGE HELPERS: load, save and calculate averages.
 def load_prom_entries() -> dict:
-    try:
-        if PROM_FILE.exists():
-            raw = json.loads(PROM_FILE.read_text(encoding="utf-8"))
-            return raw if isinstance(raw, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        st.warning("Your wellbeing file could not be read. Export or back up the file before replacing it.")
-    return {}
+    entries, ok = store.load_prom()
+    if not ok:
+        st.warning("Your wellbeing file could not be read, so it was kept aside (not overwritten) in the data folder.")
+    return entries
 
 def save_prom_entries(entries: dict) -> None:
-    PROM_FILE.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not store.save_prom(entries):
+        st.error("Could not save your check-in (disk full or no permission). Nothing was changed.")
+        st.stop()  # skip the 'saved successfully' message that follows
 
 def prom_average(entries: dict, key: str, dates: list[str]):
     vals = []
@@ -1016,27 +1185,27 @@ with tab_prom:
         st.download_button(
             "📄 Download wellbeing data (CSV)",
             export_df.to_csv(index=False),
-            file_name="spinemotion_wellbeing.csv",
+            file_name="spymotion_wellbeing.csv",
             mime="text/csv",
             use_container_width=True,
         )
         st.download_button(
             "🧸 Download wellbeing data (JSON)",
             json.dumps(prom_entries, ensure_ascii=False, indent=2),
-            file_name="spinemotion_wellbeing.json",
+            file_name="spymotion_wellbeing.json",
             mime="application/json",
             use_container_width=True,
         )
         if st.button("Delete all wellbeing entries", key="prom_delete_all"):
-            PROM_FILE.unlink(missing_ok=True)
+            store.delete_prom()
             st.session_state.pop("prom_selected_date", None)
-            st.success("All wellbeing entries deleted from this app folder.")
+            st.success("All wellbeing entries deleted from this device.")
             st.rerun()
     else:
         st.caption("No wellbeing entries have been saved yet.")
 
     st.caption(
-        f"Storage file: {PROM_FILE}. This prototype saves locally and does not sync with a clinician or cloud. "
+        f"Storage file: {store.prom_path()}. This prototype saves locally and does not sync with a clinician or cloud. "
         "The file is not encrypted by this feature; use a protected device and do not use real patient data in an unapproved prototype."
     )
     html(
@@ -1045,3 +1214,321 @@ with tab_prom:
         'should be discussed with an appropriate healthcare professional; seek urgent help for emergencies.</div>'
     )
 
+# ======================================================================
+# MEDICATION & ROUTINES TAB
+# Dedicated shortcut for daily medication and routine tracking.
+# It saves into the same local PROM JSON entry for the selected date
+# and preserves other saved wellbeing fields.
+# ======================================================================
+
+if show_medication:
+    with tab_medication:
+
+        st.markdown(
+            '<div class="prom-banner">'
+            '<div class="eyebrow">DAILY TRACKING</div>'
+            '<h2>Medication & routines</h2>'
+            '<p>A quick place to log medication, daily routines, sleep and hydration.</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="prom-note">'
+            '<b>Optional by design.</b> '
+            'Skip anything that is not relevant to you.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # --------------------------------------------------------------
+        # DATE
+        # Choose which day's medication/routine entry to edit.
+        # --------------------------------------------------------------
+
+        medication_entries = load_prom_entries()
+
+        medication_date_default = date.fromisoformat(
+            st.session_state.get(
+                "prom_selected_date",
+                date.today().isoformat(),
+            )
+        )
+
+        medication_day = st.date_input(
+            "Entry date",
+            value=medication_date_default,
+            key="prom_medication_tab_date",
+        )
+
+        medication_iso = medication_day.isoformat()
+
+        medication_existing = medication_entries.get(
+            medication_iso,
+            {},
+        )
+
+        # --------------------------------------------------------------
+        # MEDICATION
+        # --------------------------------------------------------------
+
+        st.markdown(
+            '<div class="prom-section">Medication</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.caption(
+            "Record what happened today. "
+            "This is a diary entry, not medication advice."
+        )
+
+        medication_options = [
+            "Taken as prescribed",
+            "Missed a dose",
+            "Not applicable",
+            "Prefer not to say",
+        ]
+
+        saved_medication = medication_existing.get(
+            "medication",
+            "Not applicable",
+        )
+
+        if saved_medication not in medication_options:
+            saved_medication = "Not applicable"
+
+        medication_status = st.radio(
+            "Medication taken as prescribed?",
+            medication_options,
+            index=medication_options.index(saved_medication),
+            format_func=lambda value: {
+                "Taken as prescribed": "Yes — taken as prescribed",
+                "Missed a dose": "No — missed a dose",
+                "Not applicable": "Not applicable",
+                "Prefer not to say": "Prefer not to say",
+            }[value],
+            horizontal=True,
+            key=f"prom_medication_tab_status_{medication_iso}",
+        )
+
+        missed_reason = st.text_input(
+            "Missed-dose reason (optional)",
+            value=medication_existing.get(
+                "medication_missed_reason",
+                "",
+            ),
+            max_chars=300,
+            placeholder="e.g. forgot, ran out, side effects, timing",
+            key=f"prom_medication_tab_reason_{medication_iso}",
+        )
+
+        # --------------------------------------------------------------
+        # DAILY ROUTINES
+        # --------------------------------------------------------------
+
+        st.markdown(
+            '<div class="prom-section">Daily routines</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.caption(
+            "Only record routines that are relevant to you."
+        )
+
+        rehab_options = [
+            "Not recorded",
+            "Completed",
+            "Partly completed",
+            "Not completed",
+            "Rest day",
+        ]
+
+        saved_rehab = medication_existing.get(
+            "rehab_activity",
+            "Not recorded",
+        )
+
+        if saved_rehab not in rehab_options:
+            saved_rehab = "Not recorded"
+
+        rehab_activity_tab = st.selectbox(
+            "Rehabilitation / planned activity",
+            rehab_options,
+            index=rehab_options.index(saved_rehab),
+            key=f"prom_medication_tab_rehab_{medication_iso}",
+        )
+
+        routine_options = [
+            "Not applicable",
+            "As planned",
+            "Different from usual",
+            "Not recorded",
+            "Prefer not to say",
+        ]
+
+        routine_cols = st.columns(2)
+
+        with routine_cols[0]:
+
+            saved_bowel = medication_existing.get(
+                "bowel_routine",
+                "Not applicable",
+            )
+
+            if saved_bowel not in routine_options:
+                saved_bowel = "Not applicable"
+
+            bowel_routine_tab = st.selectbox(
+                "Bowel routine (optional)",
+                routine_options,
+                index=routine_options.index(saved_bowel),
+                key=f"prom_medication_tab_bowel_{medication_iso}",
+            )
+
+        with routine_cols[1]:
+
+            saved_bladder = medication_existing.get(
+                "bladder_routine",
+                "Not applicable",
+            )
+
+            if saved_bladder not in routine_options:
+                saved_bladder = "Not applicable"
+
+            bladder_routine_tab = st.selectbox(
+                "Bladder routine (optional)",
+                routine_options,
+                index=routine_options.index(saved_bladder),
+                key=f"prom_medication_tab_bladder_{medication_iso}",
+            )
+
+        skin_options = [
+            "Not recorded",
+            "Completed",
+            "Concern noticed",
+            "Not applicable",
+            "Prefer not to say",
+        ]
+
+        saved_skin = medication_existing.get(
+            "skin_check",
+            "Not recorded",
+        )
+
+        if saved_skin not in skin_options:
+            saved_skin = "Not recorded"
+
+        routine_cols2 = st.columns(2)
+
+        with routine_cols2[0]:
+
+            skin_check_tab = st.selectbox(
+                "Skin check (optional)",
+                skin_options,
+                index=skin_options.index(saved_skin),
+                key=f"prom_medication_tab_skin_{medication_iso}",
+            )
+
+        with routine_cols2[1]:
+
+            hydration_options = [
+                "Not recorded",
+                "As planned",
+                "Less than planned",
+                "More than planned",
+                "Prefer not to say",
+            ]
+
+            saved_hydration = medication_existing.get(
+                "hydration",
+                "Not recorded",
+            )
+
+            if saved_hydration not in hydration_options:
+                saved_hydration = "Not recorded"
+
+            hydration_tab = st.selectbox(
+                "Hydration (optional)",
+                hydration_options,
+                index=hydration_options.index(saved_hydration),
+                key=f"prom_medication_tab_hydration_{medication_iso}",
+            )
+
+        # --------------------------------------------------------------
+        # SLEEP
+        # --------------------------------------------------------------
+
+        st.markdown(
+            '<div class="prom-section">Sleep</div>',
+            unsafe_allow_html=True,
+        )
+
+        sleep_hours_tab = st.number_input(
+            "Hours slept (optional)",
+            min_value=0.0,
+            max_value=24.0,
+            value=float(
+                medication_existing.get(
+                    "sleep_hours",
+                    8.0,
+                )
+            ),
+            step=0.5,
+            key=f"prom_medication_tab_sleep_{medication_iso}",
+        )
+
+        # --------------------------------------------------------------
+        # SAVE
+        # Merge with the existing wellbeing entry instead of replacing it.
+        # --------------------------------------------------------------
+
+        if st.button(
+            "Save medication & routines",
+            type="primary",
+            use_container_width=True,
+            key="prom_medication_tab_save",
+        ):
+
+            merged_entry = dict(
+                medication_entries.get(
+                    medication_iso,
+                    {},
+                )
+            )
+
+            merged_entry.update({
+                "medication": medication_status,
+                "medication_missed_reason": missed_reason,
+                "rehab_activity": rehab_activity_tab,
+                "bowel_routine": bowel_routine_tab,
+                "bladder_routine": bladder_routine_tab,
+                "skin_check": skin_check_tab,
+                "hydration": hydration_tab,
+                "sleep_hours": sleep_hours_tab,
+                "updated_at": datetime.now().isoformat(
+                    timespec="seconds"
+                ),
+            })
+
+            medication_entries[medication_iso] = merged_entry
+
+            save_prom_entries(
+                medication_entries
+            )
+
+            st.session_state[
+                "prom_selected_date"
+            ] = medication_iso
+
+            st.success(
+                f"Medication and routines saved for "
+                f"{medication_day.strftime('%d %B %Y')}."
+            )
+
+            st.rerun()
+
+        st.caption(
+            f"Entries are saved locally in {store.prom_path().name}. "
+            "The file is not encrypted; avoid entering identifiable "
+            "patient information in this prototype."
+        )

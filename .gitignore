@@ -1,0 +1,20 @@
+# Health data and footage must never be committed
+spymotion_data/
+spinemotion_data/
+spinemotion_prom_entries.json
+spymotion_prom_entries.json
+wellbeing_entries*.json
+*.corrupt-*
+clips/
+*.mp4
+*.mov
+*.m4v
+*.avi
+*.webm
+*.raw.mp4
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
