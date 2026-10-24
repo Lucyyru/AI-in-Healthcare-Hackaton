@@ -12,6 +12,13 @@ clips/
 *.avi
 *.webm
 *.raw.mp4
+clips/
+*.mp4
+*.mov
+*.avi
+validation_report.csv
+stress_report.md
+validation_report.md
 
 # Python / tooling
 __pycache__/
