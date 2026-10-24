@@ -36,7 +36,7 @@ from robust import analyze_upload
 
 st.set_page_config(
     page_title="SpyMotion",
-    page_icon="\U0001F9B4",
+    page_icon="🟢",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -327,13 +327,33 @@ def themed(chart):
     )
 
 
-# ------------------------------------------------------------------ sidebar
+# ------------------------------------------------------------------ navigation / settings
 # ======================================================================
-# SIDEBAR AREA: PRIVACY CONTROLS AND ADVANCED SETTINGS
-# Edit sidebar controls here; processing uses their values below.
-# ====================================================================== sidebar
+# PRIMARY INFORMATION ARCHITECTURE
+# The app has three top-level destinations only:
+#   1. Analyse Movement  -> the core product
+#   2. My Recovery       -> movement history + optional wellbeing context
+#   3. More              -> medication, data/privacy and settings
+# This keeps the judging/demo flow focused without removing functionality.
+# ======================================================================
+
+# Defaults are kept in session state so changing a setting immediately reruns the app
+# with the selected value. The pose model itself remains bundled and on-device.
+view_mode = st.session_state.get("view_mode", "📱 Phone")
+blur_face = st.session_state.get("blur_face", True)
+save_history = st.session_state.get("save_history", False)
+conf_thresh = float(st.session_state.get("conf_thresh", CFG.conf_thresh))
+min_prom = float(st.session_state.get("min_prom", CFG.min_prominence))
+complexity = 1
+show_medication = True  # kept as a supporting feature under More, never a top-level tab
+# ------------------------------------------------------------------ sidebar
 with st.sidebar:
-    html(f'<div class="brand">{LOGO.replace("rgba(255,255,255,.16)", "#0B6E3B")}<span>SpyMotion</span></div>')
+    html(
+        f'<div class="brand">'
+        f'{LOGO.replace("rgba(255,255,255,.16)", "#0B6E3B")}'
+        f'<span>SpyMotion</span></div>'
+    )
+
     st.markdown("### Display")
 
     view_mode = st.radio(
@@ -343,36 +363,116 @@ with st.sidebar:
         label_visibility="collapsed",
         key="view_mode",
     )
+
+    st.caption(
+        "Switch between a compact phone-style interface "
+        "and a wider desktop website."
+    )
+# Main product statement: what SpyMotion does, why it is accessible, and why it is safe.
+html(
+    f'<div class="hero"><div class="brand">{LOGO}<span>SpyMotion</span></div>'
+    "<h1>Track your rehabilitation progress from a phone video.</h1>"
+    "<p>No wearables. No specialist equipment. Your movement is analysed locally on this device.</p>"
+    '<div class="pills"><span class="pill">📱 Phone video</span>'
+    '<span class="pill">🔒 On-device</span>'
+    '<span class="pill">☁️ No cloud upload</span>'
+    '<span class="pill">🛑 Refuses unreliable scores</span></div></div>'
+)
+
+# Only three top-level destinations. Everything that supports the movement experience
+# lives one level below the core analysis and recovery views.
+tab_main, tab_recovery, tab_more = st.tabs(["Analyse Movement", "My Recovery", "More"])
+
+with tab_recovery:
+    st.markdown("### Your recovery, over time")
+    st.caption("Movement trends first, with optional wellbeing context alongside them.")
+
+    _recovery_hist = store.load_history()
+    _recovery_prom = store.load_prom()[0]
+    _summary_cols = st.columns(2)
+    if _recovery_hist:
+        _latest = _recovery_hist[-1]
+        _latest_peak = _latest.get("mean_peak")
+        _summary_cols[0].metric(
+            "Latest movement",
+            f"{float(_latest_peak):.0f}°" if isinstance(_latest_peak, (int, float)) else "Saved",
+            help="Latest saved average peak movement.",
+        )
+    else:
+        _summary_cols[0].metric("Latest movement", "—")
+
+    _today_entry = _recovery_prom.get(date.today().isoformat(), {}) if isinstance(_recovery_prom, dict) else {}
+    _today_wellbeing = _today_entry.get("overall_wellbeing") if isinstance(_today_entry, dict) else None
+    _summary_cols[1].metric(
+        "Today's wellbeing",
+        f"{_today_wellbeing}/5" if isinstance(_today_wellbeing, (int, float)) else "—",
+        help="Optional self-reported wellbeing, not a clinical score.",
+    )
+
+    tab_hist, tab_prom = st.tabs(["Progress history", "Daily wellbeing"])
+
+with tab_more:
+    st.markdown("### Supporting tools")
+    st.caption("Optional routines, privacy controls and technical settings live here so they do not interrupt the main flow.")
+    tab_medication, tab_data, tab_settings = st.tabs(["Medication & routines", "Data & privacy", "Settings"])
+
+# Settings are deliberately secondary. Sensible defaults work without touching anything here.
+with tab_settings:
+    st.markdown("### App settings")
+    st.caption("You can use SpyMotion without changing any of these settings.")
+
+    st.markdown("#### Privacy & saving")
+    blur_face = st.toggle(
+        "Blur my face in the result video",
+        value=True,
+        key="blur_face",
+        help="The original upload is temporary either way; audio is removed from the result video.",
+    )
+    save_history = st.toggle(
+        "Save my movement numbers on this device",
+        value=False,
+        key="save_history",
+        help="Only derived numbers are saved, never the original video.",
+    )
+
+    with st.expander("Advanced analysis settings", expanded=False):
+        st.caption("For testing and technical review. Most users should keep the defaults.")
+        conf_thresh = st.slider(
+            "Minimum tracking confidence per frame", 0.3, 0.9, CFG.conf_thresh, 0.05,
+            key="conf_thresh",
+            help="Frames below this threshold are ignored rather than guessed.",
+        )
+        min_prom = st.slider(
+            "Smallest movement counted as a repetition (°)", 4, 20, int(CFG.min_prominence),
+            key="min_prom",
+        )
+        st.caption("Pose model: bundled MediaPipe Pose (standard). No model download is needed.")
+
     st.divider()
-    st.caption("Your movement. Your data. Your device.")
-    blur_face = st.toggle("Blur my face in the result video", value=True)
-    save_history = st.toggle("Save my numbers on this device (never video)", value=False)
-    show_medication = st.toggle("Show optional medication & routines tab", value=False,
-                                help="Off by default to keep the app focused on movement. Entries stay on this device and are deleted by Delete everything.")
-    with st.expander("Advanced settings"):
-        conf_thresh = st.slider("Minimum tracking confidence per frame", 0.3, 0.9, CFG.conf_thresh, 0.05,
-                                help="Frames below this are ignored, not guessed.")
-        min_prom = st.slider("Smallest movement counted as a repetition (°)", 4, 20, int(CFG.min_prominence))
-        complexity = 1  # the only pose model bundled in the package; 0 and 2 download from Google at first use
-        st.caption("Pose model: MediaPipe Pose (standard), bundled with the app. It never downloads anything.")
-    st.divider()
-    if st.button("\U0001F5D1  Delete everything now", use_container_width=True):
+    st.markdown("#### Delete local data")
+    if st.button("🗑 Delete everything now", use_container_width=True, key="settings_delete_everything"):
         _rep = store.delete_everything_report()
+        # Preserve UI settings while clearing analysis/data session state.
+        _keep = {k: st.session_state.get(k) for k in ("view_mode", "blur_face", "save_history", "conf_thresh", "min_prom")}
         st.session_state.clear()
+        for _k, _v in _keep.items():
+            if _v is not None:
+                st.session_state[_k] = _v
         if _rep["failed"]:
-            st.error(f"Deleted {_rep['deleted']} file(s) but could not remove {len(_rep['failed'])}: "
-                     + ", ".join(Path(f).name for f in _rep["failed"]))
+            st.error(
+                f"Deleted {_rep['deleted']} file(s) but could not remove {len(_rep['failed'])}: "
+                + ", ".join(Path(f).name for f in _rep["failed"])
+            )
         else:
             st.success(f"Deleted {_rep['deleted']} file(s) and cleared this session.")
-    st.caption("Wipes saved numbers, the wellbeing diary, result videos and everything held in memory.")
+    st.caption("This wipes saved movement numbers, wellbeing entries and temporary result videos.")
 
 cfg = SignalConfig(conf_thresh=float(conf_thresh), min_prominence=float(min_prom))
+
 # ======================================================================
 # DISPLAY MODE
-# Phone mode keeps the interface narrow and app-like.
-# Website mode uses the available desktop width.
+# Phone mode keeps the interface narrow and app-like; website mode uses desktop width.
 # ======================================================================
-
 if view_mode == "📱 Phone":
     st.markdown(
         """
@@ -383,82 +483,28 @@ if view_mode == "📱 Phone":
             padding-left: 1rem !important;
             padding-right: 1rem !important;
         }
-
-        .grid {
-            grid-template-columns: 1fr !important;
-        }
-
-        .hero {
-            padding: 1.4rem 1.2rem !important;
-            border-radius: 20px !important;
-        }
-
-        .hero h1 {
-            font-size: 2rem !important;
-        }
-
-        .hero p {
-            font-size: 1rem !important;
-        }
-
-        .stats {
-            grid-template-columns: repeat(2, 1fr) !important;
-        }
+        .grid { grid-template-columns: 1fr !important; }
+        .hero { padding: 1.4rem 1.2rem !important; border-radius: 20px !important; }
+        .hero h1 { font-size: 2rem !important; }
+        .hero p { font-size: 1rem !important; }
+        .stats { grid-template-columns: repeat(2, 1fr) !important; }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
 else:
     st.markdown(
         """
         <style>
-        .block-container {
-            max-width: 1180px !important;
-            margin: 0 auto !important;
-        }
-
-        .grid {
-            grid-template-columns:
-                repeat(auto-fit, minmax(250px, 1fr)) !important;
-        }
-
-        .hero {
-            padding: 2.2rem 2.4rem 1.8rem !important;
-        }
-
-        .hero h1 {
-            font-size: 2.7rem !important;
-        }
-
-        .hero p {
-            font-size: 1.15rem !important;
-        }
+        .block-container { max-width: 1180px !important; margin: 0 auto !important; }
+        .grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important; }
+        .hero { padding: 2.2rem 2.4rem 1.8rem !important; }
+        .hero h1 { font-size: 2.7rem !important; }
+        .hero p { font-size: 1.15rem !important; }
         </style>
         """,
         unsafe_allow_html=True,
     )
-# ======================================================================
-# HEADER / NAVIGATION AREA: BRAND BANNER AND TOP-LEVEL TABS
-# Change the page intro and tab names here.
-# ====================================================================== hero
-html(
-    f'<div class="hero"><div class="brand">{LOGO}<span>SpyMotion</span></div>'
-    "<h1>See your recovery, privately.</h1>"
-    "<p>Film an exercise. Get your range of motion for every repetition and a clear before-and-after, "
-    "calculated entirely on this device.</p>"
-    '<div class="pills"><span class="pill">\U0001F512 100% on-device</span><span class="pill">☁️ No uploads</span>'
-    '<span class="pill">\U0001F464 No accounts</span><span class="pill">\U0001F3AC Original video never saved</span>'
-    '<span class="pill">\U0001F6D1 Refuses to score when unsure</span></div></div>'
-)
-_tab_labels = ["Check my progress", "My history", "Daily wellbeing"]
-if show_medication:
-    _tab_labels.append("Medication & routines")
-_tab_labels.append("Data & safety")
-_tabs = st.tabs(_tab_labels)
-tab_main, tab_hist, tab_prom = _tabs[0], _tabs[1], _tabs[2]
-tab_medication = _tabs[3] if show_medication else None
-tab_data = _tabs[-1]
 
 # ------------------------------------------------------------------ helpers
 # ======================================================================
@@ -540,31 +586,46 @@ def per_rep_table(res) -> None:
 
 
 def result_panel(entry, ex, ymax, title, tag) -> None:
+    """Show the patient-facing answer first; keep engineering detail optional."""
     res = entry["res"]
     with st.container(border=True):
         html(f'<div class="ptitle"><span class="tag">{tag}</span>{title}</div>')
         banner(res)
-        if entry["video"]:
-            st.video(entry["video"])
-            st.caption("Skeleton overlay, live angle and rep counter. "
-                       + ("Face blurred, audio removed." if blur_face else "Audio removed."))
-        if res.status != "rejected":
-            stat_cards([
-                ("Average peak", f"{res.mean_peak:.0f}°", "highest angle per rep"),
-                ("Repetitions", f"{res.n_reps}", "clearly detected"),
-                ("Consistency", f"±{res.sd_peak:.0f}°", "rep-to-rep spread"),
-                ("Tracking", f"{res.confidence:.0%}", "confidence"),
-            ])
-        st.altair_chart(signal_chart(res, ymax), use_container_width=True)
-        st.caption("Green line = smoothed joint movement · orange dots = detected repetition peaks · "
-                   "dashed = average peak · gaps = frames we did not trust.")
-        if res.status != "rejected":
-            with st.expander("How this was calculated (every number)"):
-                st.write(f"Side tracked: **{res.meta['side']}** · {res.meta['duration_s']:.1f} s at "
-                         f"{res.fps:.0f} fps · frames with usable tracking: {res.coverage:.0%}")
-                per_rep_table(res)
-                st.caption("Excursion = peak minus the start/end position of that rep. Movement units: "
-                           "1 = one smooth lift; higher = stepwise movement.")
+
+        if res.status == "rejected":
+            st.caption("No movement score is shown because the recording did not meet SpyMotion’s reliability checks.")
+            if entry["video"]:
+                with st.expander("View the analysed recording", expanded=False):
+                    st.video(entry["video"])
+                    st.caption("Use this only to understand what the tracker could and could not see.")
+            return
+
+        # The first glance contains only the measurements a patient is most likely to need.
+        stat_cards([
+            ("Average peak", f"{res.mean_peak:.0f}°", ex.noun),
+            ("Repetitions", f"{res.n_reps}", "clearly detected"),
+            ("Tracking quality", "Good" if res.status == "good" else "Fair", f"{res.confidence:.0%} confidence"),
+        ])
+
+        with st.expander("View analysed video & movement trace", expanded=False):
+            if entry["video"]:
+                st.video(entry["video"])
+                st.caption("Skeleton overlay, live angle and rep counter. "
+                           + ("Face blurred, audio removed." if blur_face else "Audio removed."))
+            st.altair_chart(signal_chart(res, ymax), use_container_width=True)
+            st.caption("Green line = smoothed movement · dots = detected repetition peaks · gaps = frames we did not trust.")
+
+        with st.expander("How this was calculated", expanded=False):
+            st.write(
+                f"Side tracked: **{res.meta['side']}** · {res.meta['duration_s']:.1f} s at "
+                f"{res.fps:.0f} fps · usable tracking: {res.coverage:.0%} · "
+                f"rep-to-rep spread: ±{res.sd_peak:.0f}°."
+            )
+            per_rep_table(res)
+            st.caption(
+                "Excursion = peak minus the start/end position of that rep. Movement units: "
+                "1 = one smooth lift; higher = more stepwise movement."
+            )
 
 
 def range_bar(label: str, mean_peak: float, ex, old: bool = False) -> None:
@@ -613,6 +674,8 @@ with tab_main:
         up_before = st.file_uploader("Earlier video (optional, for comparison)", type=types, key="up_before")
     with c2:
         up_after = st.file_uploader("Latest video", type=types, key="up_after")
+
+    st.caption("🔒 Processed locally. Your original video is temporary and is never kept. See More → Data & privacy for details.")
 
     step(3, "See your progress", "Everything is calculated here, on this device")
     go = st.button("Analyse on this device", type="primary", disabled=up_after is None, use_container_width=True)
@@ -670,33 +733,34 @@ with tab_main:
                 result_panel(before, ex, ymax, "Your earlier video", "Earlier")
 
         if ra.status != "rejected":
-            html('<div class="step"><div class="n">★</div><div><h2>Where this puts you</h2>'
-                 "<small>Compared with a typical full range</small></div></div>")
-            range_bar("Latest", ra.mean_peak, ex)
-            if cmp:
-                range_bar("Earlier", rb.mean_peak, ex, old=True)
-            st.caption(f"Typical full range ({ex.typical_range:.0f}°) is an approximate textbook value for adults without "
-                       "injury. Your own goal may differ — ask your physio.")
-
-            if cmp:
-                html('<div class="step"><div class="n">≋</div><div><h2>Repetition by repetition</h2>'
-                     "<small>Each dot is one repetition</small></div></div>")
-                rows = [{"Rep": r["rep"], "Peak": r["peak"], "Video": "Earlier"} for r in rb.reps] + \
-                       [{"Rep": r["rep"], "Peak": r["peak"], "Video": "Latest"} for r in ra.reps]
-                st.altair_chart(themed(
-                    alt.Chart(pd.DataFrame(rows)).mark_line(point=alt.OverlayMarkDef(size=110), strokeWidth=3).encode(
-                        x=alt.X("Rep:O", title="Repetition", axis=alt.Axis(labelAngle=0)),
-                        y=alt.Y("Peak:Q", title="Peak angle (°)", scale=alt.Scale(domain=[0, ymax])),
-                        color=alt.Color("Video:N", scale=alt.Scale(domain=["Earlier", "Latest"], range=["#8A9A91", "#0B6E3B"])),
-                        strokeDash=alt.StrokeDash("Video:N", legend=None)).properties(height=240)),
-                    use_container_width=True)
-
-            html('<div class="step"><div class="n">✦</div><div><h2>What this means</h2>'
-                 "<small>Plain-language tips from fixed rules</small></div></div>")
-            for rid, text in build_tips(ra, ex, rb if cmp else None, cmp):
-                html(f'<div class="tip"><span class="rule">{rid}</span><p>{text}</p></div>')
-            st.caption("Each tip shows the rule that produced it. No generative AI is used. "
-                       "Tips would be reviewed by a clinician before real use.")
+            with st.expander("Explore detailed recovery metrics", expanded=False):
+                html('<div class="step"><div class="n">★</div><div><h2>Where this puts you</h2>'
+                     "<small>Compared with a typical full range</small></div></div>")
+                range_bar("Latest", ra.mean_peak, ex)
+                if cmp:
+                    range_bar("Earlier", rb.mean_peak, ex, old=True)
+                st.caption(f"Typical full range ({ex.typical_range:.0f}°) is an approximate textbook value for adults without "
+                           "injury. Your own goal may differ — ask your physio.")
+    
+                if cmp:
+                    html('<div class="step"><div class="n">≋</div><div><h2>Repetition by repetition</h2>'
+                         "<small>Each dot is one repetition</small></div></div>")
+                    rows = [{"Rep": r["rep"], "Peak": r["peak"], "Video": "Earlier"} for r in rb.reps] + \
+                           [{"Rep": r["rep"], "Peak": r["peak"], "Video": "Latest"} for r in ra.reps]
+                    st.altair_chart(themed(
+                        alt.Chart(pd.DataFrame(rows)).mark_line(point=alt.OverlayMarkDef(size=110), strokeWidth=3).encode(
+                            x=alt.X("Rep:O", title="Repetition", axis=alt.Axis(labelAngle=0)),
+                            y=alt.Y("Peak:Q", title="Peak angle (°)", scale=alt.Scale(domain=[0, ymax])),
+                            color=alt.Color("Video:N", scale=alt.Scale(domain=["Earlier", "Latest"], range=["#8A9A91", "#0B6E3B"])),
+                            strokeDash=alt.StrokeDash("Video:N", legend=None)).properties(height=240)),
+                        use_container_width=True)
+    
+                html('<div class="step"><div class="n">✦</div><div><h2>What this means</h2>'
+                     "<small>Plain-language tips from fixed rules</small></div></div>")
+                for rid, text in build_tips(ra, ex, rb if cmp else None, cmp):
+                    html(f'<div class="tip"><span class="rule">{rid}</span><p>{text}</p></div>')
+                st.caption("Each tip shows the rule that produced it. No generative AI is used. "
+                           "Tips would be reviewed by a clinician before real use.")
         html(f'<div class="safety" role="note"><b>Safety.</b> {SAFETY_NOTE}</div>')
 
 # ------------------------------------------------------------------ history tab
@@ -709,7 +773,7 @@ with tab_hist:
     hist = store.load_history()
     if not hist:
         html('<div class="grid">' + icard("\U0001F4D2", "Nothing saved yet",
-             text="Switch on <b>Save my numbers on this device</b> in the sidebar. Each analysis then adds one row of "
+             text="Switch on <b>Save my movement numbers on this device</b> in More → Settings. Each analysis then adds one row of "
                   "numbers here. You can download or delete it at any time.") + "</div>")
     else:
         df = pd.DataFrame(hist)
@@ -747,7 +811,7 @@ with tab_hist:
         st.dataframe(df.drop(columns=["when"]), hide_index=True, use_container_width=True)
         st.download_button("Download my data (CSV)", df.drop(columns=["when"]).to_csv(index=False),
                            "spymotion_history.csv", "text/csv")
-        st.caption("This file lives only in the folder shown in the Data & safety tab. It is yours.")
+        st.caption("This file lives only in the local folder shown in More → Data & privacy. It is yours.")
 
 # ------------------------------------------------------------------ data & safety tab
 # ======================================================================
@@ -755,7 +819,7 @@ with tab_hist:
 # Edit user-facing safety/limitations text and data inventory here.
 # ====================================================================== data & safety tab
 with tab_data:
-    step(1, "Data & safety", "What happens to your information, in plain words")
+    step(1, "Data & privacy", "What happens to your information, in plain words")
     html('<div class="callout"><b>Try it:</b> switch off Wi-Fi and run an analysis. It works identically, '
          "because nothing leaves this device.</div>")
     html('<div class="grid">'
@@ -772,7 +836,7 @@ with tab_data:
              "Pose models are mostly trained on able-bodied people, so they can be <b>less accurate for seated, "
              "wheelchair or assisted postures</b>, other body shapes, dark clothing and poor light.",
              "So SpyMotion checks its own reliability and <b>refuses to score</b> instead of guessing.",
-             "We tested across conditions and publish where it fails (below)."])
+             "Validation tooling is included to test different conditions; generated results are shown below when available."])
          + icard("\U0001F50D", "Transparency", [
              "Every number can be expanded: per-rep peaks, tracking coverage, confidence.",
              "Tips use fixed rules, each labelled with its rule ID. No generative AI.",
@@ -1175,7 +1239,7 @@ with tab_prom:
     # EXPORT / DELETE AREA: CSV/JSON downloads and delete-all control.
     # Add additional export formats here if needed.
     st.divider()
-    st.markdown("## 🎀 Your diary data")
+    st.markdown("## Your diary data")
     if prom_entries:
         export_df = pd.DataFrame([
             {"date": d, **{k: json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v
