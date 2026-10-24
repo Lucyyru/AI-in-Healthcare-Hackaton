@@ -1,4 +1,4 @@
-# SpineMotion
+# SpyMotion
 
 Patient-owned, on-device movement progress tracking for people recovering from spinal cord injury.
 Film an exercise, get peak range of motion per repetition, consistency, and a before/after comparison
