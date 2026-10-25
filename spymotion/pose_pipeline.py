@@ -17,8 +17,8 @@ from typing import Callable, Optional
 import cv2
 import numpy as np
 
-import core
-from core import CFG, EXERCISES, SignalConfig, SignalResult
+from . import core
+from .core import CFG, EXERCISES, SignalConfig, SignalResult
 
 MAX_W = 640  # frames are downscaled for speed; angles are scale-invariant
 MAX_SECONDS = 90

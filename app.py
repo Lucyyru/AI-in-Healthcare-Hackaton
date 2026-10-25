@@ -29,11 +29,12 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-import core
-import store
-from insights import history_frame, sessions_for, progress_summary, insight_messages
-from core import CFG, EXERCISES, SAFETY_NOTE, SignalConfig, build_tips, compare, percent_of_typical
-from robust import analyze_upload
+from spymotion import robust
+from spymotion import core
+from spymotion import store
+from spymotion.insights import history_frame, sessions_for, progress_summary, insight_messages
+from spymotion.core import CFG, EXERCISES, SAFETY_NOTE, SignalConfig, build_tips, compare, percent_of_typical
+from spymotion.robust import analyze_upload
 from accessscan import analyze_access_image, result_html
 
 st.set_page_config(

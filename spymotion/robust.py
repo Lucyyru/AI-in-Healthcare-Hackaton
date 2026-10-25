@@ -12,9 +12,10 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import store
-from core import CFG, SignalConfig, SignalResult
-from pose_pipeline import analyze_video, probe_fps
+from spymotion import store
+from . import core
+from spymotion.core import CFG, SignalConfig, SignalResult
+from spymotion.pose_pipeline import analyze_video, probe_fps
 
 log = logging.getLogger("spymotion")
 
