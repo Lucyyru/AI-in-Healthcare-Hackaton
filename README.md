@@ -5,6 +5,49 @@ Film an exercise, get peak range of motion per repetition, consistency, and a be
 with the uncertainty stated. No cloud, no accounts, no API keys.
 
 ## Run it
+
+### AccessScan
+
+After setup, run this command from the repository root in Windows PowerShell:
+
+```powershell
+.\start_app.ps1
+```
+
+Open http://127.0.0.1:8501 and select **AccessScan**:
+
+1. **Wheelchair width (cm)**: the widest part of the wheelchair.
+2. **Wheelchair height (cm)**: from the ground to the armrest.
+3. Keep your phone upright and position the camera lens at armrest height. Include both passage edges and the ground.
+4. Upload the photo and press **Analyse accessibility**.
+
+The result is shown as a large **Can pass!**, **Cannot pass**, or **Unable to determine**.
+The calculation requires camera-lens height, so the camera must be at the height entered above.
+To reproduce `SidewalkDetection/images/image8.jpg`, use its known camera height of **124 cm**
+in the height field and **65 cm** for wheelchair width.
+
+First-time Windows setup, from the repository root (Python 3.10–3.12):
+
+```powershell
+git lfs pull
+python -m venv SidewalkDetection/.venv
+& .\SidewalkDetection\.venv\Scripts\python.exe -m pip install -r .\SidewalkDetection\requirements.txt
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
+.\start_app.ps1
+```
+
+The frontend and model dependencies use separate environments. The model interpreter is found
+in `SidewalkDetection/.venv`; `SIDEWALK_PYTHON` or a Git-ignored `accessscan.local.json` can override it.
+Models stay loaded and the most recent photo's boundaries and calibration are reused when measurements change.
+New photos still require model inference. Diagnostic results overwrite `SidewalkDetection/output`.
+
+AccessScan uses pretrained **Meta SAM 2.1 Small** and **GeoCalib** without retraining.
+Model details and licenses are retained in [SidewalkDetection/README_EN.md](SidewalkDetection/README_EN.md).
+The width is the median across the selected visible region; it is not a verified minimum clearance or obstacle check.
+
+### Movement analysis
+
 ```bash
 python -m venv .venv && source .venv/bin/activate      # Python 3.9-3.12 (Windows: .venv\Scripts\activate)
 pip install -r requirements.txt
