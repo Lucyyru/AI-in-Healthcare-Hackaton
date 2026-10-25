@@ -34,4 +34,4 @@ venv/
 .env
 .env.*
 !.env.example
-/SidewalkDetection/output/
+/models/SidewalkDetection/output/

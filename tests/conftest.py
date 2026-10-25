@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 @pytest.fixture(autouse=True)
 def isolated_store(tmp_path, monkeypatch):
     """Every test gets its own empty data + temp folders; the real ones are never read or deleted."""
-    import store
+    from spymotion import store
 
     data = tmp_path / "data"
     monkeypatch.setattr(store, "DATA_DIR", data)

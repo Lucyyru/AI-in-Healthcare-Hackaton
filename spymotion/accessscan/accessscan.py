@@ -22,10 +22,13 @@ log = logging.getLogger("accessscan")
 
 def backend_directory() -> Path:
     for parent in (APP_DIR, *APP_DIR.parents):
-        candidate = parent / "SidewalkDetection"
+        candidate = parent / "models" / "SidewalkDetection"
         if (candidate / "pipeline.py").is_file():
             return candidate
-    raise RuntimeError("Keep this app and SidewalkDetection inside the same project folder.")
+
+    raise RuntimeError(
+        "Could not find models/SidewalkDetection inside the project."
+    )
 
 
 def backend_python() -> str:

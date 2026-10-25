@@ -6,12 +6,11 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from accessscan_worker import ImageMeasurements
-
+from spymotion.accessscan.accessscan_worker import ImageMeasurements
 
 @pytest.fixture
 def detector(tmp_path, monkeypatch):
-    import accessscan
+    from spymotion.accessscan import accessscan
 
     monkeypatch.syspath_prepend(str(accessscan.backend_directory()))
     left = np.array([[200, 800], [350, 550], [400, 466.6666666667]])

@@ -1,7 +1,7 @@
 """
 check_clean_install.py - proves the project works from a brand-new virtual environment.
 
-    python check_clean_install.py
+    python scripts/check_clean_install.py
 
 Creates a throw-away venv, installs requirements-dev.txt, runs the whole test suite, then deletes
 the venv. Takes a few minutes the first time (downloads MediaPipe). Needs internet for pip only.

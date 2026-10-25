@@ -1219,7 +1219,7 @@ with tab_data:
             with st.expander("See clip-by-clip validation data", expanded=False):
                 st.dataframe(_val, hide_index=True, use_container_width=True)
     else:
-        st.info("No real validation dataset has been run yet. Add labelled clips and run `python validate.py --csv labels.csv --videos clips/` — SpyMotion will show the results here automatically.")
+        st.info("No real validation dataset has been run yet. Add labelled clips and run `python validate.py --csv data/labels.csv --videos clips/` — SpyMotion will show the results here automatically.")
         st.caption("Do not replace this with invented numbers: real clips, including difficult conditions, make the responsible-AI story much stronger.")
     stress = Path(__file__).with_name("stress_report.md")
     if stress.exists():

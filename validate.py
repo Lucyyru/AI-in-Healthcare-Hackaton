@@ -2,7 +2,7 @@
 validate.py - accuracy + fairness evidence for the pitch.
 
 Usage:
-    python validate.py --csv labels.csv --videos clips/
+    python validate.py --csv data/labels.csv --videos clips/
 
 labels.csv columns:
     file             clip filename inside --videos

@@ -5,7 +5,7 @@ Takes a clip the app scores well, then re-analyses degraded copies (dark, blurry
 resolution, legs cropped out, mirrored...). For each it reports whether SpyMotion still agrees
 with the original, refuses to score, or (the case to worry about) gives a different number.
 
-    python stress_test.py --video clips/knee_standing_01.mp4 --exercise knee [--side right]
+    python tests/stress_test.py --video clips/knee_standing_01.mp4 --exercise knee [--side right]
 
 Writes stress_report.md (shown in the app's Data & safety tab). Copies live in a temporary
 folder that is deleted afterwards. This tests robustness to image quality; it does NOT replace
@@ -20,8 +20,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from core import CFG
-from robust import safe_analyze
+from spymotion.core import CFG
+from spymotion.robust import safe_analyze
 
 AGREE_WITHIN = 5.0  # degrees: the app's own threshold for a "meaningful" change
 

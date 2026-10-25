@@ -10,8 +10,7 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
-import accessscan
-
+from spymotion.accessscan import accessscan
 
 def image_bytes():
     output = BytesIO()
@@ -20,15 +19,15 @@ def image_bytes():
 
 
 def test_backend_directory_at_repository_root(tmp_path, monkeypatch):
-    backend = tmp_path / "SidewalkDetection"
-    backend.mkdir()
+    backend = tmp_path / "models" / "SidewalkDetection"
+    backend.mkdir(parents=True)
     (backend / "pipeline.py").write_text("", encoding="utf-8")
     monkeypatch.setattr(accessscan, "APP_DIR", tmp_path)
     assert accessscan.backend_directory() == backend
 
 
 def test_model_environment_is_found_without_personal_configuration(tmp_path, monkeypatch):
-    backend = tmp_path / "SidewalkDetection"
+    backend = tmp_path / "models" / "SidewalkDetection"
     executable = backend / ".venv" / ("Scripts/python.exe" if accessscan.os.name == "nt" else "bin/python")
     executable.parent.mkdir(parents=True)
     executable.write_bytes(b"")
@@ -40,11 +39,11 @@ def test_model_environment_is_found_without_personal_configuration(tmp_path, mon
 
 def test_relative_model_configuration_is_resolved_from_app_folder(tmp_path, monkeypatch):
     (tmp_path / "accessscan.local.json").write_text(
-        json.dumps({"backend_python": "SidewalkDetection/.venv/Scripts/python.exe"}), encoding="utf-8"
+        json.dumps({"backend_python": "models/SidewalkDetection/.venv/Scripts/python.exe"}), encoding="utf-8"
     )
     monkeypatch.setattr(accessscan, "APP_DIR", tmp_path)
     monkeypatch.delenv("SIDEWALK_PYTHON", raising=False)
-    assert Path(accessscan.backend_python()) == (tmp_path / "SidewalkDetection/.venv/Scripts/python.exe").resolve()
+    assert Path(accessscan.backend_python()) == (tmp_path / "models/SidewalkDetection/.venv/Scripts/python.exe").resolve()
 
 
 def test_bridge_converts_units_reads_results_and_removes_upload(tmp_path):
@@ -127,10 +126,13 @@ def uploaded_photo(*args, **kwargs):
 ])
 def test_ui_result_states_and_changed_inputs(width, verdict):
     report = {"width_m": width, "passability": verdict, "warnings": []}
-    app_path = str(Path(__file__).with_name("app.py"))
+    app_path = str(Path(__file__).resolve().parents[1] / "app.py")
     with patch.object(st, "file_uploader", side_effect=uploaded_photo), \
          patch.object(accessscan, "analyze_access_image", return_value=report) as analyze:
-        app = AppTest.from_file(app_path, default_timeout=60).run()
+        app = AppTest.from_file(
+    str(Path(__file__).resolve().parents[1] / "app.py"),
+    default_timeout=60
+).run()
         assert not app.exception
         app.number_input(key="accessscan_wheelchair_width").set_value(65.0).run()
         analyze.assert_not_called()
@@ -153,7 +155,10 @@ def test_ui_result_states_and_changed_inputs(width, verdict):
 def test_ui_model_failure_is_shown_without_a_result():
     with patch.object(st, "file_uploader", side_effect=uploaded_photo), \
          patch.object(accessscan, "analyze_access_image", side_effect=RuntimeError("No passage detected")):
-        app = AppTest.from_file(str(Path(__file__).with_name("app.py")), default_timeout=60).run()
+        app = AppTest.from_file(
+    str(Path(__file__).resolve().parents[1] / "app.py"),
+    default_timeout=60
+).run()
         app.button(key="accessscan_analyse").click().run()
         assert not app.exception
         results = [element.value for element in app.markdown if 'class="accessscan-result"' in element.value]

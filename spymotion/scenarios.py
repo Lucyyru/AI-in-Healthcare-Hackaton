@@ -2,7 +2,7 @@
 scenarios.py - deterministic synthetic data for tests and reproducible demos.
 
 Everything here is generated from fixed seeds, so results are identical on every machine.
-Run `python scenarios.py` to print the regression table (what each scenario must produce).
+Run `python -m spymotion.scenarios` to print the regression table (what each scenario must produce).
 """
 from __future__ import annotations
 
