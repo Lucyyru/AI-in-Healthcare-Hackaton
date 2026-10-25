@@ -19,6 +19,7 @@ clips/
 validation_report.csv
 stress_report.md
 validation_report.md
+videos/
 
 # Python / tooling
 __pycache__/
