@@ -339,6 +339,11 @@ SpyMotion's core principle is:
 The system is intended to make rehabilitation progress easier to observe while keeping uncertainty, limitations, and user control visible.
 
 ## Credit
-Qingteng Zhang - Access Scan implementation, model integration.
+Qingteng Zhang - Access Scan implementation, model integration, Perspective and depth calculation.
 
-Junjie Zheng - Ideas, Perspective and depth calculation.
+Junjie Zheng - Access Scan implementation, model integration, Perspective and depth calculation.
+
+Lucia Rugeroni - Front end implementation, pose estimation, movement analysis, medication reminder.
+
+Emanuele Marangoni - Front end implementation, pose estimation, movement analysis, medication reminder.
+
