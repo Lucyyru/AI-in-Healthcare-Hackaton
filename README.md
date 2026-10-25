@@ -8,11 +8,11 @@ Film an exercise, measure peak range of motion per repetition, assess consistenc
 
 ### How to open
 
-#### Windows PowerShell
-
 Make sure you first do :
 cd ".../SpyMotion-main"
 ... = path to the folder "SpyMotion-main"
+
+#### Windows PowerShell
 
 ```powershell
 python -m venv .venv
