@@ -337,3 +337,7 @@ SpyMotion's core principle is:
 > **Measure when the signal is reliable. Refuse when it is not.**
 
 The system is intended to make rehabilitation progress easier to observe while keeping uncertainty, limitations, and user control visible.
+
+## Credit
+Qingteng Zhang - Access Scan implementation, model integration.
+Junjie Zheng - Ideas, Perspective and depth calculation.
