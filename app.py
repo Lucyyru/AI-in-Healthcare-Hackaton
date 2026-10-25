@@ -52,7 +52,13 @@ st.set_page_config(
 # System fonts only: loading web fonts would make a network call and break the on-device claim.
 CSS = """
 <style>
+
+html, body, .stApp {
+    color-scheme: light !important;
+}
+
 :root{
+  color-scheme: light;
   --ink:#0F2A20; --muted:#556860; --line:#D9E6DD; --mint:#E8F4EB; --mint2:#F4F9F5;
   --g900:#0B3D2E; --g700:#0B6E3B; --g500:#16A34A; --amber:#B45309; --amberbg:#FEF6E0;
   --red:#9A2A00; --redbg:#FDEDE8; --card:#FFFFFF;
@@ -295,6 +301,176 @@ button[data-baseweb="tab"][aria-selected="true"]{color:#176B43;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
+# Optional in-app dark theme. Streamlit reruns when the toggle changes, so the
+# session-state value is enough to switch the complete visual layer immediately.
+dark_mode = bool(st.session_state.get("dark_mode", False))
+
+DARK_CSS = r"""
+<style>
+/* SpyMotion dark mode: preserve the green identity while reducing glare. */
+.stApp {
+  background: radial-gradient(1100px 420px at 85% -80px, #18382C 0%, rgba(24,56,44,0) 70%),
+              linear-gradient(180deg,#0E1713 0,#111A16 520px) !important;
+  color:#EAF3ED !important;
+}
+html, body, [class*="css"] { color:#EAF3ED !important; }
+h1,h2,h3,h4,h5,h6, p, li, label, .stMarkdown, [data-testid="stCaptionContainer"] { color:#EAF3ED; }
+
+/* Surfaces */
+.icard, .tip, .verdict, [data-testid="stExpander"], [data-testid="stMetric"],
+[data-testid="stFileUploaderDropzone"], label[data-baseweb="radio"] {
+  background:#18231E !important;
+  border-color:#2C4036 !important;
+  color:#EAF3ED !important;
+}
+.icard p, .icard li, .tip p, .verdict .txt .sub, .stat .h, .stat .k, .prom-mini { color:#AFC0B7 !important; }
+.stat { background:#1A2922 !important; border-color:#2D4639 !important; }
+.stat .v { color:#EAF3ED !important; }
+.callout { background:#17271F !important; border-color:#315443 !important; color:#DDEBE3 !important; }
+.notice.ok { background:#163024 !important; border-color:#315D46 !important; color:#DDF3E5 !important; }
+.notice.warn, .safety { background:#332916 !important; border-color:#6F5A26 !important; color:#FFE6A7 !important; }
+.notice.bad { background:#351D19 !important; border-color:#704037 !important; color:#FFD2C8 !important; }
+.verdict.up { background:linear-gradient(135deg,#153326,#18231E 70%) !important; border-color:#315D46 !important; }
+.verdict.down { background:linear-gradient(135deg,#351D19,#18231E 70%) !important; border-color:#704037 !important; }
+.verdict.flat { background:linear-gradient(135deg,#202A25,#18231E 70%) !important; }
+
+/* Inputs, uploaders and buttons */
+[data-testid="stSidebar"] { background:#111C17 !important; border-right:1px solid #2C4036 !important; }
+[data-testid="stSidebar"] * { color:#EAF3ED; }
+.stButton > button, .stDownloadButton > button {
+  background:#1A2922 !important; color:#DDEBE3 !important; border-color:#355044 !important;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+  background:#22352C !important; color:#FFFFFF !important; border-color:#5A9D79 !important;
+}
+.stButton > button[kind="primary"], [data-testid="stFormSubmitButton"] > button {
+  background:linear-gradient(135deg,#176B43,#319B63) !important; color:#FFFFFF !important; border-color:#319B63 !important;
+}
+[data-testid="stFileUploaderDropzone"]:hover { background:#203229 !important; border-color:#4E9A70 !important; }
+[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea, [data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input, [data-baseweb="select"] > div {
+  background:#18231E !important; color:#EAF3ED !important; border-color:#355044 !important;
+}
+input, textarea { color:#EAF3ED !important; }
+
+/* Tabs / segmented navigation */
+div[data-baseweb="tab-list"] { background:#17251F !important; border-color:#2C4036 !important; }
+button[data-baseweb="tab"] { color:#BFD1C7 !important; }
+button[data-baseweb="tab"][aria-selected="true"] { background:#23372E !important; color:#78D09B !important; box-shadow:none !important; }
+label[data-baseweb="radio"]:hover { background:#203229 !important; border-color:#4E9A70 !important; }
+label[data-baseweb="radio"]:has(input:checked) { background:#176B43 !important; border-color:#319B63 !important; }
+
+/* PROM / calendar */
+.prom-note, .prom-section, .prom-calendar, .prom-save-hint {
+  background:#17251F !important; border-color:#2C4036 !important; color:#DDEBE3 !important;
+}
+.prom-section { border-left-color:#319B63 !important; }
+
+/* Charts / tables / progress tracks */
+[data-testid="stDataFrame"] { background:#18231E !important; }
+.bar .track { background:#26372F !important; }
+[data-testid="stProgress"] > div > div { background-color:#25382F; }
+
+/* Fix hard-coded light-theme text used by AccessScan and helper copy. */
+[style*="color:#0F2A20"], [style*="color: #0F2A20"],
+[style*="color:#15382B"], [style*="color: #15382B"] {
+  color:#EAF3ED !important;
+}
+[style*="color:#556860"], [style*="color: #556860"],
+[style*="color:#61766A"], [style*="color: #61766A"] {
+  color:#9FB5AA !important;
+}
+
+/* Streamlit field labels / descriptions / help icons. */
+[data-testid="stWidgetLabel"] p,
+[data-testid="stWidgetLabel"] label,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stCaptionContainer"],
+[data-testid="stTooltipIcon"],
+[data-testid="stTooltipHoverTarget"] {
+  color:#DDEBE3 !important;
+}
+[data-testid="stCaptionContainer"] p { color:#9FB5AA !important; }
+
+/* Number and date inputs: remove the bright white stepper/date shells. */
+[data-testid="stNumberInput"] > div,
+[data-testid="stDateInput"] > div,
+[data-testid="stTextInput"] > div,
+[data-testid="stTextArea"] > div {
+  background:#18231E !important;
+  border-color:#355044 !important;
+}
+[data-testid="stNumberInput"] button,
+[data-testid="stDateInput"] button {
+  background:#223129 !important;
+  color:#EAF3ED !important;
+  border-color:#355044 !important;
+}
+[data-testid="stNumberInput"] button:hover,
+[data-testid="stDateInput"] button:hover {
+  background:#2A4035 !important;
+  color:#FFFFFF !important;
+}
+[data-testid="stNumberInput"] svg,
+[data-testid="stDateInput"] svg { fill:#DDEBE3 !important; color:#DDEBE3 !important; }
+[data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input {
+  background:#18231E !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+}
+
+/* File uploader: Streamlit/BaseWeb uses its own nested text and button colors. */
+[data-testid="stFileUploaderDropzone"] {
+  background:#17251F !important;
+  border-color:#355044 !important;
+}
+[data-testid="stFileUploaderDropzone"] * { color:#CFE0D7 !important; }
+[data-testid="stFileUploaderDropzone"] small,
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] small {
+  color:#91A89C !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
+  background:#22352C !important;
+  color:#F3F8F5 !important;
+  border:1px solid #456556 !important;
+}
+[data-testid="stFileUploaderDropzone"] button:hover {
+  background:#2B4337 !important;
+  border-color:#67A884 !important;
+}
+[data-testid="stFileUploaderDropzone"] svg { color:#9BC7AE !important; fill:#9BC7AE !important; }
+
+/* Forms and generic BaseWeb controls. */
+[data-baseweb="input"] > div,
+[data-baseweb="textarea"],
+[data-baseweb="select"] > div,
+[data-baseweb="base-input"] {
+  background:#18231E !important;
+  border-color:#355044 !important;
+  color:#EAF3ED !important;
+}
+[data-baseweb="input"] input,
+[data-baseweb="textarea"] textarea,
+[data-baseweb="select"] span { color:#EAF3ED !important; }
+input::placeholder, textarea::placeholder { color:#71877B !important; opacity:1 !important; }
+
+/* Sections used by the wellbeing page. */
+.prom-note, .prom-note *, .prom-section, .prom-section *,
+.prom-calendar, .prom-calendar *, .prom-save-hint, .prom-save-hint * {
+  color:#DDEBE3 !important;
+}
+.prom-mini { color:#9FB5AA !important; }
+
+/* Keep the brand hero vivid in both modes. */
+.hero, .prom-banner { color:#FFFFFF !important; }
+.hero *, .prom-banner * { color:#FFFFFF !important; }
+.hero p, .prom-banner p { color:#E3F4E8 !important; }
+</style>
+"""
+if dark_mode:
+    st.markdown(DARK_CSS, unsafe_allow_html=True)
 
 LOGO = (
     '<svg width="34" height="34" viewBox="0 0 34 34" role="img" aria-label="SpyMotion logo">'
@@ -321,12 +497,33 @@ def icard(icon: str, title: str, items: list[str] | None = None, text: str = "")
 
 
 def themed(chart):
+    dark = bool(st.session_state.get("dark_mode", False))
+    text = "#DDEBE3" if dark else "#3B4A42"
+    grid = "#2A3A33" if dark else "#E3ECE6"
+    edge = "#3A5045" if dark else "#C5D6CB"
+
     return (
         chart.configure_view(strokeWidth=0)
         .configure(background="transparent")
-        .configure_axis(labelColor="#3B4A42", titleColor="#3B4A42", labelFontSize=13, titleFontSize=13,
-                        titleFontWeight=600, gridColor="#E3ECE6", domainColor="#C5D6CB", tickColor="#C5D6CB")
-        .configure_legend(labelFontSize=13, titleFontSize=13, orient="top", title=None, symbolSize=160)
+        .configure_axis(
+            labelColor=text,
+            titleColor=text,
+            labelFontSize=13,
+            titleFontSize=13,
+            titleFontWeight=600,
+            gridColor=grid,
+            domainColor=edge,
+            tickColor=edge,
+        )
+        .configure_legend(
+            labelColor=text,
+            titleColor=text,
+            labelFontSize=13,
+            titleFontSize=13,
+            orient="top",
+            title=None,
+            symbolSize=160,
+        )
     )
 
 
@@ -372,6 +569,13 @@ with st.sidebar:
     st.caption(
         "Switch between a compact phone-style interface "
         "and a wider desktop website."
+    )
+
+    dark_mode = st.toggle(
+        "🌙 Dark mode",
+        value=bool(st.session_state.get("dark_mode", False)),
+        key="dark_mode",
+        help="Switch SpyMotion between the light and dark visual themes.",
     )
 # Main product statement: what SpyMotion does, why it is accessible, and why it is safe.
 html(
@@ -560,7 +764,7 @@ with tab_settings:
     if st.button("🗑 Delete everything now", use_container_width=True, key="settings_delete_everything"):
         _rep = store.delete_everything_report()
         # Preserve UI settings while clearing analysis/data session state.
-        _keep = {k: st.session_state.get(k) for k in ("view_mode", "blur_face", "privacy_mode", "conf_thresh", "min_prom")}
+        _keep = {k: st.session_state.get(k) for k in ("view_mode", "dark_mode", "blur_face", "privacy_mode", "conf_thresh", "min_prom")}
         st.session_state.clear()
         for _k, _v in _keep.items():
             if _v is not None:

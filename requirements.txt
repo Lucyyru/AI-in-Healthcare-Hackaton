@@ -1,10 +1,27 @@
-# Python 3.9 - 3.12.  Legacy mp.solutions API is required, so mediapipe is pinned.
+# Supported Python versions: 3.9–3.12
+# MediaPipe is pinned because SpyMotion relies on the legacy mp.solutions API.
 mediapipe==0.10.14
+
+# MediaPipe 0.10.14 is not compatible with NumPy 2.x.
 numpy<2
+
+# OpenCV with the contrib modules used by the video-processing pipeline.
 opencv-contrib-python>=4.8,<4.12
+
+# Signal processing and numerical analysis.
 scipy>=1.10
+
+# Dataframes, history, validation, and reporting.
 pandas>=2.0
+
+# SpyMotion frontend.
 streamlit>=1.38,<1.50
+
+# Charts and visualisations.
 altair>=5,<6
+
+# Local video encoding / FFmpeg support.
 imageio-ffmpeg>=0.4.9
-pyarrow>=14,<19      # newer pyarrow needs numpy>=2, which mediapipe 0.10.14 cannot use (charts/tables would crash)
+
+# Keep PyArrow below 19 to avoid NumPy 2.x dependency conflicts with MediaPipe.
+pyarrow>=14,<19
