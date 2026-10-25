@@ -3,8 +3,8 @@ import json
 
 import numpy as np
 
-import core
-import scenarios
+from spymotion import core
+from spymotion import scenarios
 
 FPS = 30.0
 

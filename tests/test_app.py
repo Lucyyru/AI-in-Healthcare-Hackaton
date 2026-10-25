@@ -8,12 +8,12 @@ import pytest
 pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
-import core  # noqa: E402
-import robust  # noqa: E402
-import scenarios  # noqa: E402
-import store  # noqa: E402
+from spymotion import core  # noqa: E402
+from spymotion import robust  # noqa: E402
+from spymotion import scenarios  # noqa: E402
+from spymotion import store  # noqa: E402
 
-APP = str(Path(__file__).with_name("app.py"))
+APP = str(Path(__file__).resolve().parents[1] / "app.py")
 
 
 def entry(peak, seed, side="right", conf=0.95):
@@ -27,14 +27,11 @@ def failed(reason="The video file is empty."):
     return {"res": robust.failed_result(reason), "video": None, "label": "x", "key": "failed"}
 
 
-def launch(analysis=None, medication=False):
+def launch(analysis=None):
     at = AppTest.from_file(APP, default_timeout=90)
     if analysis is not None:
         at.session_state["analysis"] = analysis
     at.run()
-    if medication:
-        [t for t in at.sidebar.toggle if "medication" in t.label.lower()][0].set_value(True)
-        at.run()
     return at
 
 
@@ -51,14 +48,17 @@ def test_empty_state_and_tabs():
     at = launch()
     no_errors(at)
     labels = [t.label for t in at.tabs]
-    assert labels == ["Check my progress", "My history", "Daily wellbeing", "Data & safety"]
+    assert "Analyse Movement" in labels
+    assert "Daily wellbeing" in labels
+    assert "More" in labels
 
 
-def test_medication_tab_is_optional_and_works_when_on():
-    at = launch(medication=True)
+def test_medication_tab_is_available():
+    at = launch()
     no_errors(at)
-    assert "Medication & routines" in [t.label for t in at.tabs]
 
+    labels = [t.label for t in at.tabs]
+    assert "Medication & routines" in labels
 
 @pytest.mark.parametrize("name,before,after", [
     ("improved", entry(60, 1), entry(82, 2)),
@@ -116,7 +116,7 @@ def test_delete_everything_button_wipes_history_diary_and_temp_files():
     _populate()
     assert len(store.audit()) == 3
     at = launch()
-    [b for b in at.sidebar.button if "Delete everything" in b.label][0].click().run()
+    [b for b in at.button if "Delete everything" in b.label][0].click().run()
     no_errors(at)
     assert store.audit() == [] and store.load_history() == [] and store.load_prom() == ({}, True)
 

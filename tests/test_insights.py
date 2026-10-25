@@ -1,6 +1,11 @@
 import pandas as pd
 
-from insights import history_frame, sessions_for, progress_summary, insight_messages
+from spymotion.insights import (
+    history_frame,
+    sessions_for,
+    progress_summary,
+    insight_messages,
+)
 
 
 def _rows(peaks, statuses=None):

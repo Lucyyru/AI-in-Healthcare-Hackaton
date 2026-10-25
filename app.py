@@ -1053,7 +1053,14 @@ with tab_hist:
         _sides = [x for x in ("left", "right") if x in set(df.loc[df["exercise"] == _chosen_ex, "side"].dropna())]
         _chosen_side = st.selectbox("Side", _sides, format_func=str.title, key="history_insight_side") if _sides else None
         progress_insight_panel(hist, _chosen_ex, _chosen_side, 10)
+        if "n_reps" not in df.columns:
+            df["n_reps"] = 0
 
+        if "exercise" not in df.columns:
+            df["exercise"] = "Unknown"
+
+        if "mean_peak" not in df.columns:
+            df["mean_peak"] = None
         st.markdown("#### All saved sessions")
         st.altair_chart(themed(
             alt.Chart(df).mark_line(point=alt.OverlayMarkDef(size=110), strokeWidth=3).encode(

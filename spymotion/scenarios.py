@@ -106,7 +106,7 @@ def build(name):
 
 
 def run(name):
-    import core
+    from . import core
 
     s, c, view = build(name)
     return core.process_signal(s, c, FPS, view_ratio=view)

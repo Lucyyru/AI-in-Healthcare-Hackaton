@@ -74,7 +74,7 @@ Google at first use, so the app never selects them.
 7. Tips from fixed rules, each labelled with its rule ID (R1...R8). No generative model.
 8. Result video: skeleton overlay, live angle, rep counter, **face pixelated, audio stripped**.
 9. Optional daily wellbeing diary; the History tab plots movement next to pain/fatigue on days with both.
-   The medication & routines tab is optional and **off by default** (sidebar toggle).
+   The Medication & routines section is available under the More tab.
 
 ## What is stored on disk (and how to wipe it)
 

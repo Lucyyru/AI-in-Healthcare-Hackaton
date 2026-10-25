@@ -8,12 +8,12 @@ import pytest
 cv2 = pytest.importorskip("cv2")
 mp = pytest.importorskip("mediapipe")
 
-import core  # noqa: E402
-import pose_pipeline as pp  # noqa: E402
-import robust  # noqa: E402
-import scenarios  # noqa: E402
-import store  # noqa: E402
-from core import SignalConfig  # noqa: E402
+from spymotion import core  # noqa: E402
+from spymotion import pose_pipeline as pp  # noqa: E402
+from spymotion import robust  # noqa: E402
+from spymotion import scenarios  # noqa: E402
+from spymotion import store  # noqa: E402
+from spymotion.core import SignalConfig  # noqa: E402
 
 CFG = SignalConfig()
 W, H = 320, 240

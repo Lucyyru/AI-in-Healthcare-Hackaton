@@ -7,10 +7,10 @@ import pytest
 cv2 = pytest.importorskip("cv2")
 pytest.importorskip("mediapipe")
 
-import core  # noqa: E402
-import robust  # noqa: E402
-import scenarios  # noqa: E402
-import stress_test  # noqa: E402
+from spymotion import core  # noqa: E402
+from spymotion import robust  # noqa: E402
+from spymotion import scenarios  # noqa: E402
+from tests import stress_test  # noqa: E402
 import validate  # noqa: E402
 
 

@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pose_pipeline import analyze_video
+from spymotion.pose_pipeline import analyze_video
 
 
 def main():
@@ -76,7 +76,10 @@ def main():
                      f"{'n/a' if np.isnan(mae) else f'{mae:.1f}'} | {g.coverage.mean():.0%} |")
     lines += ["", "Where the app refuses to score, it is behaving as designed rather than guessing.",
               "Reference = manual measurement; this checks the pose estimate, not a clinical goniometer."]
-    (Path(args.out) / "validation_report.md").write_text("\n".join(lines))
+    (Path(args.out) / "validation_report.md").write_text(
+    "\n".join(lines),
+    encoding="utf-8",
+)
     print("\n".join(lines))
 
 
