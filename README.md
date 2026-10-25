@@ -12,7 +12,7 @@ Film an exercise, measure peak range of motion per repetition, assess consistenc
 
 Make sure you first do :
 cd ".../main"
-... = path to the folder "main"
+... = path to the folder "SpyMotion-main"
 
 ```powershell
 python -m venv .venv
