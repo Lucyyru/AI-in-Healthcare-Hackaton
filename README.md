@@ -11,7 +11,7 @@ Film an exercise, measure peak range of motion per repetition, assess consistenc
 #### Windows PowerShell
 
 Make sure you first do :
-cd ".../main"
+cd ".../SpyMotion-main"
 ... = path to the folder "SpyMotion-main"
 
 ```powershell
