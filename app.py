@@ -35,7 +35,7 @@ from spymotion import store
 from spymotion.insights import history_frame, sessions_for, progress_summary, insight_messages
 from spymotion.core import CFG, EXERCISES, SAFETY_NOTE, SignalConfig, build_tips, compare, percent_of_typical
 from spymotion.robust import analyze_upload
-from accessscan import analyze_access_image, result_html
+from spymotion.accessscan.accessscan import analyze_access_image, result_html
 
 st.set_page_config(
     page_title="SpyMotion",
