@@ -1,6 +1,7 @@
 # Python 3.9 - 3.12.  Legacy mp.solutions API is required, so mediapipe is pinned.
 mediapipe==0.10.14
 numpy<2
+opencv-contrib-python>=4.8,<4.12
 scipy>=1.10
 pandas>=2.0
 streamlit>=1.38,<1.50

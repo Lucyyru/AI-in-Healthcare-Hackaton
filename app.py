@@ -34,6 +34,7 @@ import store
 from insights import history_frame, sessions_for, progress_summary, insight_messages
 from core import CFG, EXERCISES, SAFETY_NOTE, SignalConfig, build_tips, compare, percent_of_typical
 from robust import analyze_upload
+from accessscan import analyze_access_image, result_html
 
 st.set_page_config(
     page_title="SpyMotion",
@@ -336,7 +337,7 @@ def themed(chart):
 #   2. AccessScan        -> wheelchair-fit image upload and future analysis
 #   3. My Recovery       -> movement history + optional wellbeing context
 #   4. More              -> medication, data/privacy and settings
-# AccessScan is frontend-only for now; the production backend can be wired into its analysis button.
+# AccessScan calls the independent SAM 2 + GeoCalib environment through accessscan.py.
 # ======================================================================
 
 # Defaults are kept in session state so changing a setting immediately reruns the app
@@ -391,16 +392,12 @@ with tab_access:
         '<div class="prom-banner">'
         '<div class="eyebrow">ACCESSIBILITY CHECK</div>'
         '<h2>Will my wheelchair fit?</h2>'
-        '<p>Upload a photo of a doorway or passage. AccessScan is designed to estimate the opening and compare it with your wheelchair width.</p>'
+        '<p>Upload a photo of a passage. AccessScan estimates its width and compares it with your wheelchair width.</p>'
         '</div>'
     )
 
-    html(
-        '<div class="callout"><b>Frontend preview.</b> Image capture and the result area are ready. '
-        'The measurement service can be connected to the Analyse button when the production backend is available.</div>'
-    )
-
-    step(1, "Tell us your wheelchair width", "Used to calculate estimated clearance")
+    step(1, "Enter your measurements", "Use centimetres for both values")
+    html('<div class="accessscan-field-label" style="color:#0F2A20;font-weight:700;margin-bottom:6px;">Wheelchair width (cm)</div>')
     wheelchair_width = st.number_input(
         "Wheelchair width (cm)",
         min_value=30.0,
@@ -408,10 +405,30 @@ with tab_access:
         value=68.0,
         step=0.5,
         key="accessscan_wheelchair_width",
+        label_visibility="collapsed",
         help="Measure the widest part of the wheelchair. This stays on this device in the current prototype.",
+    )
+    html(
+        '<div class="accessscan-field-label" style="color:#0F2A20;font-weight:700;margin-top:8px;">Wheelchair height (cm)</div>'
+        '<div style="color:#556860;font-size:13px;margin-bottom:6px;">From the ground to the armrest.</div>'
+    )
+    camera_height = st.number_input(
+        "Wheelchair height (cm)",
+        min_value=10.0,
+        max_value=300.0,
+        value=124.0,
+        step=1.0,
+        key="accessscan_camera_height",
+        label_visibility="collapsed",
+        help="Measure from the ground to the armrest. Position the camera lens at this height when taking the photo.",
     )
 
     step(2, "Add a photo", "Keep the whole doorway or passage visible")
+    html(
+        '<div class="accessscan-photo-tip" style="color:#0F2A20;margin-bottom:12px;">'
+        'Please keep your phone upright when taking the photo.<br>'
+        '<span style="font-size:13px;color:#556860;">Position the camera lens at armrest height.</span></div>'
+    )
     access_image = st.file_uploader(
         "Upload doorway or passage image",
         type=["jpg", "jpeg", "png", "webp"],
@@ -421,7 +438,7 @@ with tab_access:
 
     if access_image is not None:
         st.image(access_image, caption="Image ready for AccessScan", use_container_width=True)
-        st.caption("Tip: a straight-on photo with the full opening visible will give the future measurement backend the best input.")
+        st.caption("Include both passage edges and the ground.")
     else:
         html(
             '<div class="icard" style="text-align:center;padding:1.8rem 1.2rem;">'
@@ -431,7 +448,7 @@ with tab_access:
             '</div>'
         )
 
-    step(3, "Check the fit", "AccessScan will return clearance and confidence")
+    step(3, "Check the fit", "Estimate the passage width and compare it with your wheelchair")
     access_go = st.button(
         "Analyse accessibility",
         type="primary",
@@ -443,35 +460,26 @@ with tab_access:
     if access_image is None:
         st.caption("Upload a photo above to enable analysis.")
 
+    access_key = (
+        hashlib.sha256(access_image.getvalue()).hexdigest(), camera_height, wheelchair_width
+    ) if access_image is not None else None
+
     if access_go:
-        # BACKEND INTEGRATION POINT:
-        # Send `access_image.getvalue()` and `wheelchair_width` to the production AccessScan backend here.
-        # Expected future response fields could include opening_width_cm, uncertainty_cm,
-        # clearance_cm, confidence, and verdict (fits / too_narrow / uncertain).
-        st.session_state["accessscan_pending"] = True
+        st.session_state.pop("accessscan_result", None)
+        with st.spinner("Analyzing photo..."):
+            try:
+                access_report = analyze_access_image(
+                    access_image.getvalue(), Path(access_image.name).suffix,
+                    camera_height, wheelchair_width,
+                )
+            except (RuntimeError, ValueError, OSError) as error:
+                print(f"AccessScan analysis failed: {error}", flush=True)
+                access_report = {"width_m": None}
+            st.session_state["accessscan_result"] = {"key": access_key, "report": access_report}
 
-    if st.session_state.get("accessscan_pending") and access_image is not None:
-        with st.container(border=True):
-            html('<div class="ptitle"><span class="tag">AccessScan</span>Measurement result</div>')
-            st.info("The frontend is ready. Connect the production AccessScan backend here to return the measured opening, clearance and confidence.")
-            r1, r2, r3 = st.columns(3)
-            r1.metric("Opening", "— cm")
-            r2.metric("Wheelchair", f"{wheelchair_width:.1f} cm")
-            r3.metric("Clearance", "— cm")
-            st.markdown("**Fit decision**")
-            html(
-                '<div class="notice warn"><b class="t">Waiting for measurement backend</b>'
-                'No accessibility verdict is shown until a real measurement and its uncertainty are available.</div>'
-            )
-            st.caption("Recommended backend outputs: opening width ± uncertainty, wheelchair width, clearance, confidence, and Fits / Too narrow / Too close to call.")
-
-    with st.expander("How AccessScan should make a safe decision", expanded=False):
-        st.markdown(
-            "- Compare the estimated clear opening with the wheelchair width.\n"
-            "- Return the measurement with an uncertainty range, not just one number.\n"
-            "- If the uncertainty overlaps the required clearance, show **Too close to call** instead of guessing.\n"
-            "- Treat the result as an accessibility estimate, not a guarantee; handles, thresholds and approach angle can still matter."
-        )
+    access_result = st.session_state.get("accessscan_result")
+    if access_result is not None and access_result["key"] == access_key:
+        html(result_html(access_result["report"]))
 
 
 with tab_recovery:

@@ -26,3 +26,12 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+
+# AccessScan: machine settings, model environment and generated results
+accessscan.local.json
+venv/
+*.log
+.env
+.env.*
+!.env.example
+/SidewalkDetection/output/
