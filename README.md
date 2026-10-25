@@ -6,6 +6,30 @@ Film an exercise, measure peak range of motion per repetition, assess consistenc
 
 ## Run it
 
+### How to open
+
+#### Windows PowerShell
+
+Make sure you first do :
+cd ".../main"
+... = path to the folder "main"
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+#### Linux / macOS
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
 ### AccessScan
 
 AccessScan estimates whether a wheelchair can fit through a photographed doorway or passage.
